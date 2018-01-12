@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
 
 # Project
-set(target nmninx)
+set(target nminx)
 project(${target})
 
 # Version number
@@ -27,7 +27,10 @@ include_directories(
 
 file(GLOB_RECURSE app_src RELATIVE ${CMAKE_SOURCE_DIR} "src/*")
 
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -pthread")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_C_FLAGS}")
+
 ## Source files
 add_executable(${PROJECT_NAME} ${app_src})
-target_link_libraries(${PROJECT_NAME} mtcp)
+target_link_libraries(${PROJECT_NAME} mtcp numa)
 
