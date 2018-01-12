@@ -125,20 +125,17 @@ void ctx_destroy(struct server_ctx* ctx)
 
 int listen_socket(struct server_ctx* ctx, int queue_size, in_addr_t ip, in_port_t port)
 {
-	int result;
-	int socket;
-
 	struct sockaddr_in saddr;
 	struct mtcp_epoll_event ev;
 
-	socket = mtcp_socket(ctx->mctx, AF_INET, SOCK_STREAM, 0);
-	if(socket < 0) 
+	ctx->socket = mtcp_socket(ctx->mctx, AF_INET, SOCK_STREAM, 0);
+	if(ctx->socket < 0) 
 	{
 		printf("Failed to create listening socket!\n");
 		return -1;
 	}
 
-	result = mtcp_setsock_nonblock(ctx->mctx, socket);
+	int result = mtcp_setsock_nonblock(ctx->mctx, ctx->socket);
 	if(result < 0) 
 	{
 		printf("Failed to set socket in nonblocking mode.\n");
@@ -151,7 +148,7 @@ int listen_socket(struct server_ctx* ctx, int queue_size, in_addr_t ip, in_port_
 	saddr.sin_addr.s_addr = ip;
 	saddr.sin_port = port;
 
-	result = mtcp_bind(ctx->mctx, socket, 
+	result = mtcp_bind(ctx->mctx, ctx->socket, 
 			(struct sockaddr *)&saddr, sizeof(struct sockaddr_in));
 	if (result < 0) 
 	{
@@ -159,8 +156,7 @@ int listen_socket(struct server_ctx* ctx, int queue_size, in_addr_t ip, in_port_
 		return -1;
 	}
 
-
-	result = mtcp_listen(ctx->mctx, socket, queue_size);
+	result = mtcp_listen(ctx->mctx, ctx->socket, queue_size);
 	if(result < 0)
 	{
 		printf("mtcp_listen() failed!\n");
@@ -169,10 +165,10 @@ int listen_socket(struct server_ctx* ctx, int queue_size, in_addr_t ip, in_port_
 	
 	/* wait for incoming accept events */
 	ev.events = MTCP_EPOLLIN;
-	ev.data.sockid = socket;
-	mtcp_epoll_ctl(ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_ADD, socket, &ev);
+	ev.data.sockid = ctx->socket;
+	mtcp_epoll_ctl(ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_ADD, ctx->socket, &ev);
 
-	return socket;
+	return 0;
 }
 
 int accept_connection(struct server_ctx *ctx)
@@ -211,6 +207,12 @@ int accept_connection(struct server_ctx *ctx)
 	return c_socket;
 }
 
+void close_connection(struct server_ctx* ctx, int c_socket)
+{
+	mtcp_epoll_ctl(ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_DEL, c_socket, NULL);
+	mtcp_close(ctx->mctx, c_socket);
+}
+
 int worker(int core)
 {
 	struct mtcp_epoll_event *events;
@@ -237,10 +239,11 @@ int worker(int core)
 		return 2;
 	}
 
-	ctx->socket = listen_socket(ctx, 4096, INADDR_ANY, htons(8080));
-	//ctx->socket = listen_socket(ctx, 4096, inet_addr("127.0.0.1"), htons(8080));
-	if (ctx->socket < 0) 
+	int result = listen_socket(ctx, 4096, INADDR_ANY, htons(8080));
+	//int result = listen_socket(ctx, 4096, inet_addr("127.0.0.1"), htons(8080));
+	if (result != 0) 
 	{
+		free(events);
 		ctx_destroy(ctx);
 		printf("Failed to create listening socket.\n");
 		return 3;
@@ -275,8 +278,7 @@ int worker(int core)
 				/* error on the connection */
 				printf("[CPU %d] Error on socket %d\n", core, events[i].data.sockid);
 
-
-				int result = mtcp_getsockopt(ctx->mctx, events[i].data.sockid, SOL_SOCKET, SO_ERROR, (void *)&err, &len);
+				result = mtcp_getsockopt(ctx->mctx, events[i].data.sockid, SOL_SOCKET, SO_ERROR, (void *)&err, &len);
 				if (result == 0) 
 				{
 					if (err != ETIMEDOUT) 
@@ -289,55 +291,35 @@ int worker(int core)
 				{
 					printf("mtcp_getsockopt");
 				}
-				//CloseConnection(ctx, events[i].data.sockid, 
-						//&ctx->svars[events[i].data.sockid]);
+				close_connection(ctx, events[i].data.sockid);
 			} 
 			else if (events[i].events & MTCP_EPOLLIN)
 			{
 				printf("Read handler in this place\n");
-				//ret = HandleReadEvent(ctx, events[i].data.sockid, 
-						//&ctx->svars[events[i].data.sockid]);
-
-				//if (ret == 0) {
-					//[> connection closed by remote host <]
-					//CloseConnection(ctx, events[i].data.sockid, 
-							//&ctx->svars[events[i].data.sockid]);
-				//} else if (ret < 0) {
-					//[> if not EAGAIN, it's an error <]
-					//if (errno != EAGAIN) {
-						//CloseConnection(ctx, events[i].data.sockid, 
-								//&ctx->svars[events[i].data.sockid]);
-					//}
-				//}
-
 			} 
 			else if (events[i].events & MTCP_EPOLLOUT) 
 			{
 				printf("Write handler in this place\n");
-				//struct server_vars *sv = &ctx->svars[events[i].data.sockid];
-				//if (sv->rspheader_sent) {
-					//SendUntilAvailable(ctx, events[i].data.sockid, sv);
-				//} else {
-					//TRACE_APP("Socket %d: Response header not sent yet.\n", 
-							//events[i].data.sockid);
-				//}
-
-			} else {
+			} 
+			else 
+			{	//shit happens
 				assert(0);
 			}
 		}
 
 		if(do_accept)
 		{
-			while (1)
+			result = accept_connection(ctx);
+			if(result < 0)
 			{
-				int result = accept_connection(ctx);
-				if (result < 0) break;
+				printf("Accept connection failed, err: %d!\n", result);
 			}
 		}
 	}
 
 	printf("Worker is stoped!\n");
+
+	free(events);
 	ctx_destroy(ctx);
 
 	return 0;
