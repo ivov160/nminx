@@ -19,6 +19,11 @@
 #define RCVBUF_SIZE (2*1024)
 #define SNDBUF_SIZE (8*1024)
 
+#define CBUF_SIZE (RCVBUF_SIZE*2)
+
+#define MAX(a, b) 			((a)>(b)?(a):(b))
+#define MIN(a, b) 			((a)<(b)?(a):(b))
+
 #define MAX_EVENTS (MAX_FLOW_NUM * 3)
 
 #define TRUE 1;
@@ -27,13 +32,23 @@
 static int is_active = TRUE;
 static char *conf_file = "config/nminx.conf";
 
+///@todo implement ring buffer
+struct connection_ctx
+{
+	char buffer[CBUF_SIZE];
+	uint32_t size;
+
+	uint32_t offset;
+	uint8_t flushed;
+};
+
 struct server_ctx
 {
 	mctx_t mctx;
 	int ep;
 	int socket;
 
-	//struct server_vars *vars;
+	struct connection_ctx* connections;
 };
 
 /*----------------------------------------------------------------------------*/
@@ -86,16 +101,15 @@ struct server_ctx* ctx_init(int core)
 		return NULL;
 	}
 
-	/* allocate memory for server variables */
-	//ctx->vars = (struct server_vars*) calloc(MAX_FLOW_NUM, sizeof(struct server_vars));
-	//if (!ctx->vars) 
-	//{
-		//mtcp_close(ctx->mctx, ctx->ep);
-		//mtcp_destroy_context(ctx->mctx);
-		//free(ctx);
-		//printf("Failed to create server_vars struct!\n");
-		//return NULL;
-	//}
+	ctx->connections = (struct connection_ctx*) calloc(MAX_FLOW_NUM, sizeof(struct connection_ctx));
+	if(!ctx->connections)
+	{
+		mtcp_close(ctx->mctx, ctx->ep);
+		mtcp_destroy_context(ctx->mctx);
+		free(ctx);
+		printf("Failed allocation memmory for connections pool!\n");
+		return NULL;
+	}
 
 	return ctx;
 }
@@ -104,9 +118,11 @@ void ctx_destroy(struct server_ctx* ctx)
 {
 	if(ctx)
 	{
-		//if(ctx->vars)
-		//{
-		//}
+		if(ctx->connections)
+		{	/// @todo need checking for not closed connections
+			/// or loop with force connection_close
+			free(ctx->connections);
+		}
 
 		//if(ctx->ep >= 0)
 		if(ctx->socket >= 0)
@@ -173,7 +189,7 @@ int listen_socket(struct server_ctx* ctx, int queue_size, in_addr_t ip, in_port_
 
 int accept_connection(struct server_ctx *ctx)
 {
-	//struct server_vars *sv;
+	struct connection_ctx* conn_ctx;
 	struct mtcp_epoll_event ev;
 	int c_socket;
 
@@ -186,8 +202,10 @@ int accept_connection(struct server_ctx *ctx)
 			return -1;
 		}
 
-		//sv = &ctx->svars[c];
-		//CleanServerVariable(sv);
+		conn_ctx = &ctx->connections[c_socket];
+		memset(conn_ctx, 0, sizeof(struct connection_ctx));
+		conn_ctx->flushed = 1;
+
 		printf("New connection %d accepted.\n", c_socket);
 		ev.events = MTCP_EPOLLIN;
 		ev.data.sockid = c_socket;
@@ -211,6 +229,69 @@ void close_connection(struct server_ctx* ctx, int c_socket)
 {
 	mtcp_epoll_ctl(ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_DEL, c_socket, NULL);
 	mtcp_close(ctx->mctx, c_socket);
+}
+
+int write_handler(struct server_ctx* ctx, int c_socket)
+{
+	uint32_t sent = 0;
+
+	struct mtcp_epoll_event ev;
+	struct connection_ctx* conn_ctx;
+
+	conn_ctx = &ctx->connections[c_socket];
+	if(!conn_ctx->flushed)
+	{
+		uint32_t w_size = MIN(SNDBUF_SIZE, (conn_ctx->size <= conn_ctx->offset ? 0 : conn_ctx->size - conn_ctx->offset));
+		if(w_size > 0) 
+		{
+			sent = mtcp_write(ctx->mctx, c_socket, conn_ctx->buffer + conn_ctx->offset, w_size);
+			if (sent < 0) 
+			{
+				return sent;
+			}
+
+			printf("Socket %d: mtcp_write try: %d, ret: %d\n", c_socket, w_size, sent);
+			conn_ctx->offset += sent;
+		}
+		else
+		{	//nothing to write, buffer sended to client, disable EPOLLOUT event
+			memset(conn_ctx, 0, sizeof(struct connection_ctx));
+			conn_ctx->flushed = 1;
+
+			ev.events = MTCP_EPOLLIN;
+			ev.data.sockid = c_socket;
+			mtcp_epoll_ctl(ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_MOD, c_socket, &ev);
+		}
+	}
+	return sent;
+}
+
+int read_handler(struct server_ctx* ctx, int c_socket)
+{
+	struct mtcp_epoll_event ev;
+	struct connection_ctx* conn_ctx;
+
+	uint32_t size = 0;
+	conn_ctx = &ctx->connections[c_socket];
+
+	if(conn_ctx->flushed)
+	{
+		uint32_t read_size = MIN(RCVBUF_SIZE, CBUF_SIZE);
+		size = mtcp_read(ctx->mctx, c_socket, conn_ctx->buffer, read_size);
+		if(size <= 0) 
+		{	
+			return size;
+		}
+		conn_ctx->flushed = 0;
+		conn_ctx->size += size;
+
+		ev.events = MTCP_EPOLLOUT;
+		ev.data.sockid = c_socket;
+		mtcp_epoll_ctl(ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_MOD, c_socket, &ev);
+	}
+	return size;
+	////return read_size;
+	//return write_handler(ctx, c_socket, buffer, RCVBUF_SIZE);
 }
 
 int worker(int core)
@@ -296,10 +377,12 @@ int worker(int core)
 			else if (events[i].events & MTCP_EPOLLIN)
 			{
 				printf("Read handler in this place\n");
+				read_handler(ctx, events[i].data.sockid);
 			} 
 			else if (events[i].events & MTCP_EPOLLOUT) 
 			{
 				printf("Write handler in this place\n");
+				write_handler(ctx, events[i].data.sockid);
 			} 
 			else 
 			{	//shit happens
