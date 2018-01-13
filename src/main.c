@@ -55,18 +55,6 @@ struct server_ctx
 void signal_handler(int signum)
 {
 	is_active = FALSE;
-	//int i;
-
-	//for (i = 0; i < core_limit; i++) {
-		//if (app_thread[i] == pthread_self()) {
-			////TRACE_INFO("Server thread %d got SIGINT\n", i);
-			//done[i] = TRUE;
-		//} else {
-			//if (!done[i]) {
-				//pthread_kill(app_thread[i], signum);
-			//}
-		//}
-	//}
 }
 
 struct server_ctx* ctx_init(int core)
@@ -124,7 +112,6 @@ void ctx_destroy(struct server_ctx* ctx)
 			free(ctx->connections);
 		}
 
-		//if(ctx->ep >= 0)
 		if(ctx->socket >= 0)
 		{
 			mtcp_epoll_ctl(ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_DEL, ctx->socket, NULL);
@@ -290,8 +277,6 @@ int read_handler(struct server_ctx* ctx, int c_socket)
 		mtcp_epoll_ctl(ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_MOD, c_socket, &ev);
 	}
 	return size;
-	////return read_size;
-	//return write_handler(ctx, c_socket, buffer, RCVBUF_SIZE);
 }
 
 int worker(int core)
@@ -321,7 +306,6 @@ int worker(int core)
 	}
 
 	int result = listen_socket(ctx, 4096, INADDR_ANY, htons(8080));
-	//int result = listen_socket(ctx, 4096, inet_addr("127.0.0.1"), htons(8080));
 	if (result != 0) 
 	{
 		free(events);
@@ -433,7 +417,6 @@ int main(int argc, char* argv[])
 		printf("somthing wrong, app stoped, result: %d\n", result);
 	}
 
-	//atexit(mtcp_destroy());
 	mtcp_destroy();
 
 	return 0;
