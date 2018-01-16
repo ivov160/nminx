@@ -16,12 +16,15 @@ set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 #include(settings)
 
 find_package(netmap REQUIRED)
+find_package(Numa REQUIRED)
 find_package(mTCP REQUIRED)
 
 # Add header location
 include_directories(
 	/usr/lib
 	/usr/local/lib
+	${MTCP_INCLUDE_DIR}
+	${NUMA_INCLUDE_DIR}
 	${CMAKE_SOURCE_DIR}/include
 )
 
@@ -32,5 +35,5 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_C_FLAGS}")
 
 ## Source files
 add_executable(${PROJECT_NAME} ${app_src})
-target_link_libraries(${PROJECT_NAME} mtcp numa)
+target_link_libraries(${PROJECT_NAME} ${MTCP_LIBRARY} ${NUMA_LIBRARY})
 
