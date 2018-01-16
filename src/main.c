@@ -8,11 +8,15 @@
 #include <signal.h>
 #include <assert.h>
 
+#include <unistd.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
 #include <mtcp_api.h>
 #include <mtcp_epoll.h>
+
+#include <nminx/nminx.h>
+#include <nminx/watchdog.h>
 
 #define MAX_FLOW_NUM  (10000)
 
@@ -26,10 +30,11 @@
 
 #define MAX_EVENTS (MAX_FLOW_NUM * 3)
 
-#define TRUE 1;
-#define FALSE 0;
+#define WAIT_TIMEOUT_MS 1000
 
-static int is_active = TRUE;
+int* state_flag = NULL;
+
+/*
 static char *conf_file = "config/nminx.conf";
 
 ///@todo implement ring buffer
@@ -50,13 +55,9 @@ struct server_ctx
 
 	struct connection_ctx* connections;
 };
+*/
 
-/*----------------------------------------------------------------------------*/
-void signal_handler(int signum)
-{
-	is_active = FALSE;
-}
-
+/*
 struct server_ctx* ctx_init(int core)
 {
 	struct server_ctx* ctx;
@@ -70,7 +71,7 @@ struct server_ctx* ctx_init(int core)
 		return NULL;
 	}
 
-	/* create mtcp context: this will spawn an mtcp thread */
+	// create mtcp context: this will spawn an mtcp thread 
 	ctx->mctx = mtcp_create_context(core);
 	if (!ctx->mctx) 
 	{
@@ -79,7 +80,7 @@ struct server_ctx* ctx_init(int core)
 		return NULL;
 	}
 
-	/* create epoll descriptor */
+	// create epoll descriptor 
 	ctx->ep = mtcp_epoll_create(ctx->mctx, MAX_EVENTS);
 	if (ctx->ep < 0) 
 	{
@@ -166,8 +167,9 @@ int listen_socket(struct server_ctx* ctx, int queue_size, in_addr_t ip, in_port_
 		return -1;
 	}
 	
-	/* wait for incoming accept events */
-	ev.events = MTCP_EPOLLIN;
+	// wait for incoming accept events 
+	//ev.events = MTCP_EPOLLIN;
+	ev.events = MTCP_EPOLLIN|MTCP_EPOLLRDHUP|MTCP_EPOLLET;
 	ev.data.sockid = ctx->socket;
 	mtcp_epoll_ctl(ctx->mctx, ctx->ep, MTCP_EPOLL_CTL_ADD, ctx->socket, &ev);
 
@@ -314,16 +316,17 @@ int worker(int core)
 		return 3;
 	}
 
-	while(is_active)
+	//while(is_active)
+	while(*state_flag)
 	{
-		printf("in worker cycle\n");
-		nevents = mtcp_epoll_wait(ctx->mctx, ctx->ep, events, MAX_EVENTS, -1);
+		nevents = mtcp_epoll_wait(ctx->mctx, ctx->ep, events, MAX_EVENTS, WAIT_TIMEOUT_MS);
 		if (nevents < 0) 
 		{
 			if (errno != EINTR) 
 			{
 				perror("mtcp_epoll_wait");
 			}
+			printf("loop break\n");
 			break;
 		}
 
@@ -332,7 +335,7 @@ int worker(int core)
 		{
 			if (events[i].data.sockid == ctx->socket) 
 			{
-				/* if the event is for the listener, accept connection */
+				//if the event is for the listener, accept connection
 				do_accept = TRUE;
 			} 
 			else if (events[i].events & MTCP_EPOLLERR) 
@@ -340,7 +343,7 @@ int worker(int core)
 				int err;
 				socklen_t len = sizeof(err);
 
-				/* error on the connection */
+				//error on the connection
 				printf("[CPU %d] Error on socket %d\n", core, events[i].data.sockid);
 
 				result = mtcp_getsockopt(ctx->mctx, events[i].data.sockid, SOL_SOCKET, SO_ERROR, (void *)&err, &len);
@@ -392,8 +395,7 @@ int worker(int core)
 	return 0;
 }
 
-
-int main(int argc, char* argv[]) 
+void mtcp_loop()
 {
 	struct mtcp_conf mcfg;
 
@@ -401,15 +403,16 @@ int main(int argc, char* argv[])
 	if(result) 
 	{
 		printf("Failed to initialize mtcp\n");
-		return 0;
+		return;
 	}
 
 	//mtcp_getconf(&mcfg);
 		//mcfg.num_cores = 1;
 	//mtcp_setconf(&mcfg);
 
-	/* register signal handler to mtcp */
-	mtcp_register_signal(SIGINT, signal_handler);
+	//mtcp_register_signal(SIGINT, signal_handler);
+	//mtcp_register_signal(SIGTERM, signal_handler);
+	//signal(SIGALRM, sys_timer);
 
 	result = worker(0);
 	if(result != 0)
@@ -418,6 +421,147 @@ int main(int argc, char* argv[])
 	}
 
 	mtcp_destroy();
+}
+*/
+
+static int watchdog_worker(void* data);
+static int run_server_worker(void* data);
+static int watchdog_state_handler(process_state_t* state, void* data);
+
+static process_config_t watchdog_process = { watchdog_worker, NULL };
+static process_config_t server_process = { run_server_worker, NULL };
+
+static watchdog_process_config_t workers[] = {
+	{ &server_process, watchdog_state_handler /* state_handler */, NULL /* state_handler data */ },
+	{ &server_process, watchdog_state_handler /* state_handler */, NULL /* state_handler data */ },
+	{ &server_process, watchdog_state_handler /* state_handler */, NULL /* state_handler data */ }
+};
+
+static void watchdog_signal_handler(int sig)
+{
+	printf("watchdog_signal_handler called, sig: %d\n", sig);
+	if(state_flag)
+	{
+		*state_flag = FALSE;
+	}
+
+	if(watchdog_signal_all(sig) != NMINX_OK)
+	{
+		printf("Failed pass signal: %i to childrens\n", sig);
+	}
+}
+
+static void server_signal_handler(int sig)
+{
+	if(state_flag)
+	{
+		*state_flag = FALSE;
+	}
+}
+
+static int server_worker(void* data)
+{
+	printf("server_worker started\n");
+
+	int is_active = TRUE;
+	state_flag = &is_active;
+
+	signal(SIGTERM, server_signal_handler);
+
+	while(is_active)
+	{
+		//printf("server_worker test\n");
+		sleep(1);
+	}
+
+	////mtcp_loop();
+	//int result = worker(0);
+	//if(result != 0)
+	//{
+		//printf("somthing wrong, app stoped, result: %d\n", result);
+	//}
+	return NMINX_OK;
+}
+
+static int run_server_worker(void* data)
+{
+	sigset_t sig_set;
+	if(sigfillset(&sig_set) != 0)
+	{
+		printf("Failed get signal set, error: %s\n", strerror(errno));
+		return NMINX_ERROR;
+	}
+
+	sigdelset(&sig_set, SIGTERM);
+	sigprocmask(SIG_SETMASK, &sig_set, NULL);
+
+	return server_worker(data);
+}
+
+static int watchdog_state_handler(process_state_t* state, void* data)
+{
+	if(state_flag && *state_flag)
+	{
+		return NMINX_AGAIN;
+	}
+	return NMINX_ABORT;
+}
+
+static int watchdog_worker(void* data)
+{	
+	printf("watchdog_worker started\n");
+
+	int is_active = TRUE;
+	state_flag = &is_active;
+
+	sigset_t sig_set;
+	if(sigfillset(&sig_set) != 0)
+	{
+		printf("Failed get signal set, error: %s\n", strerror(errno));
+		return NMINX_ERROR;
+	}
+
+	signal(SIGTERM, watchdog_signal_handler);
+	signal(SIGINT, watchdog_signal_handler);
+
+	if(watchdog(workers) != NMINX_OK)
+	{
+		printf("Failed initialize watchdog!\n");
+		return NMINX_ERROR;
+	}
+
+	//struct mtcp_conf mcfg;
+
+	//int result = mtcp_init(conf_file);
+	//if(result) 
+	//{
+		//printf("Failed to initialize mtcp\n");
+		//return NMINX_ERROR;
+	//}
+
+	while(is_active)
+	{
+		watchdog_exec(&is_active, WAIT_TIMEOUT_MS);
+	}
+
+	watchdog_stop();
+
+	//mtcp_destroy();
+	return NMINX_OK;
+}
+
+int main(int argc, char* argv[]) 
+{
+	daemon_config_t cfg;
+	memset(&cfg, 0, sizeof(daemon_config_t));
+
+	cfg.process = &watchdog_process;
+
+	if(process_daemon(&cfg) != NMINX_OK)
+	{
+		printf("Failed start daemon process\n");
+		return -1;
+	}
 
 	return 0;
 }
