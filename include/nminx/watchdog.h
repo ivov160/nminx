@@ -27,8 +27,6 @@ typedef struct
 
 } watchdog_process_config_t;
 
-#define watchdog(POOL) watchdog_start(POOL, sizeof(POOL) / sizeof(watchdog_process_config_t))
-
 int watchdog_start(watchdog_process_config_t* pool, uint32_t size);
 int watchdog_stop();
 
