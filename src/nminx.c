@@ -18,6 +18,8 @@
 #include <nminx/nminx.h>
 #include <nminx/watchdog.h>
 
+#include <nminx/server.h>
+
 #define MAX_FLOW_NUM  (10000)
 
 #define RCVBUF_SIZE (2*1024)
@@ -32,10 +34,10 @@
 
 #define WAIT_TIMEOUT_MS 1000
 
-int* state_flag = NULL;
+static int is_active = NULL;
 
-/*
-static char *conf_file = "config/nminx.conf";
+static char* default_mtcp_config_path = "config/nminx.conf";
+static int default_backlog_size = 4096;
 
 ///@todo implement ring buffer
 struct connection_ctx
@@ -55,9 +57,7 @@ struct server_ctx
 
 	struct connection_ctx* connections;
 };
-*/
 
-/*
 struct server_ctx* ctx_init(int core)
 {
 	struct server_ctx* ctx;
@@ -395,34 +395,33 @@ int worker(int core)
 	return 0;
 }
 
-void mtcp_loop()
-{
-	struct mtcp_conf mcfg;
+//void mtcp_loop()
+//{
+	//struct mtcp_conf mcfg;
 
-	int result = mtcp_init(conf_file);
-	if(result) 
-	{
-		printf("Failed to initialize mtcp\n");
-		return;
-	}
+	//int result = mtcp_init(conf_file);
+	//if(result) 
+	//{
+		//printf("Failed to initialize mtcp\n");
+		//return;
+	//}
 
-	//mtcp_getconf(&mcfg);
-		//mcfg.num_cores = 1;
-	//mtcp_setconf(&mcfg);
+	////mtcp_getconf(&mcfg);
+		////mcfg.num_cores = 1;
+	////mtcp_setconf(&mcfg);
 
-	//mtcp_register_signal(SIGINT, signal_handler);
-	//mtcp_register_signal(SIGTERM, signal_handler);
-	//signal(SIGALRM, sys_timer);
+	////mtcp_register_signal(SIGINT, signal_handler);
+	////mtcp_register_signal(SIGTERM, signal_handler);
+	////signal(SIGALRM, sys_timer);
 
-	result = worker(0);
-	if(result != 0)
-	{
-		printf("somthing wrong, app stoped, result: %d\n", result);
-	}
+	//result = worker(0);
+	//if(result != 0)
+	//{
+		//printf("somthing wrong, app stoped, result: %d\n", result);
+	//}
 
-	mtcp_destroy();
-}
-*/
+	//mtcp_destroy();
+//}
 
 static int watchdog_worker(void* data);
 static int run_server_worker(void* data);
@@ -439,12 +438,8 @@ static watchdog_process_config_t workers[] = {
 
 static void watchdog_signal_handler(int sig)
 {
-	printf("watchdog_signal_handler called, sig: %d\n", sig);
-	if(state_flag)
-	{
-		*state_flag = FALSE;
-	}
-
+	//printf("watchdog_signal_handler called, sig: %d\n", sig);
+	is_active = FALSE;
 	if(watchdog_signal_all(sig) != NMINX_OK)
 	{
 		printf("Failed pass signal: %i to childrens\n", sig);
@@ -453,33 +448,48 @@ static void watchdog_signal_handler(int sig)
 
 static void server_signal_handler(int sig)
 {
-	if(state_flag)
-	{
-		*state_flag = FALSE;
-	}
+	is_active = FALSE;
 }
 
 static int server_worker(void* data)
 {
 	printf("server_worker started\n");
-
-	int is_active = TRUE;
-	state_flag = &is_active;
-
-	signal(SIGTERM, server_signal_handler);
-
-	while(is_active)
+	if(!data)
 	{
-		//printf("server_worker test\n");
-		sleep(1);
+		printf("Main config is NULL\n");
+		return NMINX_ERROR;
+	}
+	nminx_config_t* n_cfg = (nminx_config_t*) data;
+
+	server_config_t* s_cfg = server_init(n_cfg);
+	if(!s_cfg)
+	{
+		printf("Failed create server!\n");
+		return NMINX_ERROR;
 	}
 
-	////mtcp_loop();
-	//int result = worker(0);
-	//if(result != 0)
-	//{
-		//printf("somthing wrong, app stoped, result: %d\n", result);
-	//}
+	listen_socket_config_t* ls_cfg = listen_socket_open(n_cfg->backlog, n_cfg->ip, n_cfg->port);
+	if(!ls_cfg)
+	{
+		printf("Failed create listen socket!\n");
+		server_destroy(s_cfg);
+		return NMINX_ERROR;
+	}
+
+	s_cfg->l_socket = ls_cfg;
+	while(is_active)
+	{
+		int result = server_process_events(s_cfg);
+		if(result == NMINX_ERROR)
+		{	// somthing wrong break loop, worker exit
+			printf("Server process events error!\n");
+			break;
+		}
+	}
+
+	listen_socket_close(ls_cfg);
+	server_destroy(s_cfg);
+
 	return NMINX_OK;
 }
 
@@ -492,15 +502,17 @@ static int run_server_worker(void* data)
 		return NMINX_ERROR;
 	}
 
+	// condfigure signals
 	sigdelset(&sig_set, SIGTERM);
 	sigprocmask(SIG_SETMASK, &sig_set, NULL);
+	signal(SIGTERM, server_signal_handler);
 
 	return server_worker(data);
 }
 
 static int watchdog_state_handler(process_state_t* state, void* data)
 {
-	if(state_flag && *state_flag)
+	if(is_active)
 	{
 		return NMINX_AGAIN;
 	}
@@ -511,8 +523,12 @@ static int watchdog_worker(void* data)
 {	
 	printf("watchdog_worker started\n");
 
-	int is_active = TRUE;
-	state_flag = &is_active;
+	if(!data)
+	{
+		printf("Main config is NULL\n");
+		return NMINX_ERROR;
+	}
+	nminx_config_t* n_cfg = (nminx_config_t*) data;
 
 	sigset_t sig_set;
 	if(sigfillset(&sig_set) != 0)
@@ -530,32 +546,52 @@ static int watchdog_worker(void* data)
 		return NMINX_ERROR;
 	}
 
-	//struct mtcp_conf mcfg;
+	int result = mtcp_init(n_cfg->mtcp_config_path);
+	if(result) 
+	{
+		printf("Failed to initialize mtcp\n");
+		return NMINX_ERROR;
+	}
 
-	//int result = mtcp_init(conf_file);
-	//if(result) 
-	//{
-		//printf("Failed to initialize mtcp\n");
-		//return NMINX_ERROR;
-	//}
+	//struct mtcp_conf mcfg = { 0 };
+	////mtcp_getconf(&mcfg);
+		////mcfg.num_cores = 1;
+	////mtcp_setconf(&mcfg);
 
 	while(is_active)
 	{
-		watchdog_exec(&is_active, WAIT_TIMEOUT_MS);
+		watchdog_exec(&is_active, n_cfg->wdt_timeout_ms);
 	}
-
 	watchdog_stop();
 
-	//mtcp_destroy();
+	mtcp_destroy();
 	return NMINX_OK;
 }
 
 int main(int argc, char* argv[]) 
 {
-	daemon_config_t cfg;
-	memset(&cfg, 0, sizeof(daemon_config_t));
+	// initialize application config
+	nminx_config_t nminx_cfg = { 0 };
+	nminx_cfg.wdt_timeout_ms = 1000;
+	nminx_cfg.mtcp_config_path = default_mtcp_config_path;
+	nminx_cfg.backlog = default_backlog_size;
 
-	cfg.process = &watchdog_process;
+	// initialize wdt_process
+	//process_config_t wdt_process = { 0 };
+	//wdt_process.process = watchdog_worker;
+	//wdt_process.data = (void*) &nminx_cfg;
+	
+	// initialize wdt_process
+	process_config_t* wdt_process = &watchdog_process;
+	wdt_process->data = (void*) &nminx_cfg;
+
+	// initialize server_process
+	process_config_t* srv_process = &server_process;
+	srv_process->data = (void*) &nminx_cfg;
+
+	// initialize daemon 
+	daemon_config_t cfg = { 0 };
+	cfg.process = &wdt_process;
 
 	if(process_daemon(&cfg) != NMINX_OK)
 	{
