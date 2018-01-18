@@ -1,39 +1,49 @@
 #include <nminx/socket.h>
+// not good hack, but now all mtcp data hidden in modules
+// io implementation (mtcp) can be replaced without big refactoring
+#include "io_ctx.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <error.h>
+#include <errno.h>
+#include <string.h>
 
 #include <mtcp_api.h>
 #include <mtcp_epoll.h>
 
 
-static int listen_socket_open_fd(io_ctx_t* io, nminx_config_t* m_cfg);
-static int listen_socket_close_fd(io_ctx_t* io, int s_fd);
+static int listen_socket_open_fd(nminx_config_t* m_cfg, io_ctx_t* io);
+static int listen_socket_close_fd(int s_fd, io_ctx_t* io);
 
 //listen_socket_config_t* listen_socket_open(int backlog, in_addr_t ip, in_port_t port)
-socket_ctx_t* socket_open(io_ctx_t* io, nminx_config_t* m_cfg)
-{
-	int socket_fd = listen_socket_open_fd(io, m_cfg);
-	if(socket_fd < 0)
-	{
-		printf("Failed open socket fd, error: %s\n", strerror(errno));
-		return NULL;
-	}
+//socket_ctx_t* socket_open(nminx_config_t* m_cfg, io_ctx_t* io)
+//{
+	//int socket_fd = listen_socket_open_fd(io, m_cfg);
+	//if(socket_fd < 0)
+	//{
+		//printf("Failed open socket fd, error: %s\n", strerror(errno));
+		//return NULL;
+	//}
 
-	listen_socket_config_t* l_socket = (listen_socket_config_t*)
-		calloc(1, sizeof(listen_socket_config_t));
+	//listen_socket_config_t* l_socket = (listen_socket_config_t*)
+		//calloc(1, sizeof(listen_socket_config_t));
 
-	if(!l_socket)
-	{
-		printf("Failed allocation listen_socket_config_t\n");
-		listen_socket_close_fd(io, socket_fd);
-		return NULL;
-	}
+	//if(!l_socket)
+	//{
+		//printf("Failed allocation listen_socket_config_t\n");
+		//listen_socket_close_fd(io, socket_fd);
+		//return NULL;
+	//}
 
-	l_socket->socket = socket_fd;
-	l_socket->handler
+	//l_socket->socket = socket_fd;
+	//l_socket->handler
 
-	return 0;
-}
+	//return 0;
+//}
 
-int listen_socket_open_fd(io_ctx_t* io, nminx_config_t* m_cfg)
+int listen_socket_open_fd(nminx_config_t* m_cfg, io_ctx_t* io)
 {
 	struct sockaddr_in saddr;
 	struct mtcp_epoll_event ev;
@@ -88,7 +98,7 @@ int listen_socket_close(listen_socket_config_t* socket)
 {
 }
 
-int listen_socket_close_fd(io_ctx_t* io, int s_fd);
+int listen_socket_close_fd(int s_fd, io_ctx_t* io)
 {
 	mtcp_epoll_ctl(io->mctx, io->ep, MTCP_EPOLL_CTL_DEL, s_fd, NULL);
 	mtcp_close(io->mctx, s_fd);

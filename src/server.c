@@ -1,4 +1,5 @@
 #include <nminx/server.h>
+#inc
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,31 +15,47 @@ static server_ctx_t server_ctx = { 0 };
 server_ctx_t* server_init(nminx_config_t* m_cfg)
 {
 	server_ctx_t* s_ctx = &server_ctx;
-	if(s_ctc->io_ctx)
+	if(s_ctx->io_ctx)
 	{
 		return &s_ctx;
 	}
 
-	s_cfg->m_cfg = m_cfg;
-	s_cfg->io_ctx = io_init(m_cfg);
-	if(!s_cfg->io_ctx)
+	io_ctx_t* io_ctx = io_init(m_cfg);
+	if(!s_ctx->io_ctx)
 	{
 		printf("Failed initialize io system!\n");
 		return NULL;
 	}
 
 
-	//listen_socket_open(
+	socket_ctx_t* l_sock = socket_create(io_ctx);
+	if(!l_sock)
+	{
+		printf("Failed open socket!\n");
+		io_destroy(io_ctx);
+		return NULL;
+	}
 
-	///@todo initialize connections set flags by defailt and etc.
-	//s_cfg->connections = (struct connection_ctx*) calloc(MAX_FLOW_NUM, sizeof(struct connection_ctx));
-	//if(!s_cfg->connections)
-	//{
-		//mtcp_destroy_context(s_cfg->mctx);
-		//free(ctx);
-		//printf("Failed allocation memmory for connections pool!\n");
-		//return NULL;
-	//}
+	if(socket_bind(l_sock, m_cfg->ip, m_cfg->port) == NMINX_ERROR)
+	{
+		printf("Failed bind socket!\n");
+		socket_destroy(l_sock);
+		io_destroy(io_ctx);
+		return NULL;
+	}
+
+	if(socket_listen(l_sock) == NMINX_ERROR)
+	{
+		printf("Failed start listen socket!\n");
+		socket_destroy(l_sock);
+		io_destroy(io_ctx);
+		return NULL;
+	}
+	
+	s_ctx->m_cfg = m_cfg;
+	s_ctx->io_ctx = io_ctx;
+	s_ctx->sockets[0] = l_sock;
+
 	return s_ctx;
 }
 
@@ -46,18 +63,20 @@ int server_destroy(server_ctx_t* s_ctx)
 {
 	if(s_ctx == &server_ctx)
 	{
-		///@todo finilize connextion
-		//if(s_cfg->connections)
-		//{	
-			///// or loop with force connection_close
-			//free(s_cfg->connections);
-		//}
+		// from back, because index 0 is contains a listen socket
+		for(int i = MAX_CONNECTIONS; i >= 0; --i)
+		{
+			if(s_ctx->sockets[i])
+			{
+				socket_ctx_t* sock = &s_ctx->sockets[i];
 
-		//if(s_cfg->socket >= 0)
-		//{
-			//mtcp_epoll_ctl(s_cfg->mctx, s_cfg->ep, MTCP_EPOLL_CTL_DEL, s_cfg->socket, NULL);
-			////mtcp_close(s_cfg->mctx, s_cfg->socket);
-		//}
+				// finilize socket and destory 
+				socket_close_action(sock);
+				socket_destroy(sock);
+
+				s_ctx->sockets[i] = NULL;
+			}
+		}
 
 		if(s_ctx->io_ctx)
 		{
@@ -67,6 +86,46 @@ int server_destroy(server_ctx_t* s_ctx)
 	}
 	return NMINX_OK;
 }
+
+///@todo need add errors handling
+int server_process_events(server_ctx_t* s_cfg)
+{
+	io_ctx_t* io = s_cfg->io;
+
+	socket_ctx_t sb[MAX_CONNECTIONS] = { 0 };
+	int nc = io_process_events(io, &sb, MAX_CONNECTIONS);
+
+	if (nc < 0) 
+	{
+		return errno != EINTR ? NMINX_ERROR : NMINX_ABORT;
+	}
+
+	for(int i = 0; i < nc; ++i)
+	{
+		socket_ctx_t* sock = &sb[i];
+		if(sock->flags & SOCK_ERROR)
+		{
+			int result = socket_close_action(sock);
+		}
+		else if(sock->flags & SOCK_READ)
+		{
+			int result = socket_read_action(sock);
+			// result handling
+		}
+		else if(sock->flags & SOCK_WRITE)
+		{
+			int result = socket_write_action(sock);
+			// result handling
+		}
+		else
+		{	// unexpected flag state
+			assert(0);
+		}
+	}
+
+	return NMINX_OK;
+}
+
 
 //int server_process_events(server_ctx_t* cfg)
 int server_process_events(server_ctx_t* s_cfg, struct mtcp_epoll_event* eb, int eb_size)
@@ -140,7 +199,7 @@ int server_process_events(server_ctx_t* s_cfg, struct mtcp_epoll_event* eb, int 
 		}
 		else 
 		{
-			connection_ctx_t* c_connect = &s_cfg->connections[c_socket];
+			connection_ctx_t* c_connect = &s_ctx->connections[c_socket];
 		}
 	}
 	return NMINX_OK;

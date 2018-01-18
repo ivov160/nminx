@@ -49,12 +49,10 @@ static int worker_process(void* data)
 		return NMINX_ERROR;
 	}
 	server_ctx_t* s_cfg = (server_ctx_t*) data;
-	nminx_config_t* m_cfg = s_cfg->m_cfg;
 
-	struct mtcp_epoll_event events[MAX_CONNECTIONS] = { 0 };
 	while(is_active)
 	{
-		int result = server_process_events(s_cfg, events, m_cfg->mtcp_max_events);
+		int result = server_process_events(s_cfg);
 		if(result != NMINX_OK)
 		{	// somthing wrong break loop, worker exit
 			printf("Worker process events stoped!\n");

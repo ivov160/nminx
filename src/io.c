@@ -1,4 +1,7 @@
 #include <nminx/io.h>
+// not good hack, but now all mtcp data hidden in modules
+// io implementation (mtcp) can be replaced without big refactoring
+#include "io_ctx.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,15 +13,6 @@
 #include <mtcp_api.h>
 #include <mtcp_epoll.h>
 
-
-//struct
-//{
-	//int ep;
-	//mctx_t mctx;
-
-//} mtcp_io_ctx_t;
-
-//static struct mtcp_io_ctx_t io_ctx = { 0 };
 static io_ctx_t mtcp_io_ctx = { 0 };
 
 io_ctx_t* io_init(nminx_config_t* m_cfg)
@@ -75,4 +69,9 @@ int io_destroy(io_ctx_t* io)
 		mtcp_io_ctx.mctx = NULL;
 		mtcp_io_ctx.ep = 0;
 	}
+}
+
+int io_poll_events(io, socket_ctx_t* s_buff, int s_buff_size)
+{
+	int n
 }
