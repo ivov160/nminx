@@ -71,7 +71,47 @@ int io_destroy(io_ctx_t* io)
 	}
 }
 
-int io_poll_events(io, socket_ctx_t* s_buff, int s_buff_size)
+int io_poll_ctl(io_ctx_t* io, int op, int flags, socket_ctx_t* sock)
 {
-	int n
+	if(!io || !sock)
+	{
+		struct mtcp_epoll_event ev = { 0 };
+		ev.data.ptr = (void*) sock;
+		ev.events = flags;
+
+		int result = mtcp_epoll_ctl(io->mctx, io->ep, op, sock->fd, &ev);
+		return result < 0 : NMINX_ERROR : NMINX_OK;
+
+	}
+	return NMINX_ERROR;
+}
+
+int io_poll_events(io_ctx_t* io, socket_ctx_t** s_buff, int s_buff_size)
+{
+	mtcp_epoll_event* events = (mtcp_epoll_event*) 
+		malloc(sizeof(mtcp_epoll_event) * s_buff_size);
+
+	int nevents = mtcp_epoll_wait(io->mctx, io->ep, events, s_buff_size, -1);
+	if (nevents < 0) 
+	{
+		free(events);
+		return NMINX_ERROR;
+	}
+
+	int s_buff_offset = 0;
+	for (int i = 0; i < nevents; i++) 
+	{
+		if (events[i].data.ptr)
+		{
+			socket_ctx_t* socket = (socket_ctx_t*) events[i].data.ptr;
+			socket->flags = events[i].events;
+
+			s_buff[s_buff_offset] = socket;
+			++s_buff_offset;
+		}
+	}
+	
+	free(events);
+	// convert offset to count
+	return s_buff_offset + 1;
 }
