@@ -1,5 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <signal.h>
+
+#include <error.h>
+#include <errno.h>
+#include <string.h>
 
 #include <nminx/nminx.h>
 #include <nminx/server.h>
@@ -48,11 +53,11 @@ static int worker_process(void* data)
 		printf("Main config is NULL\n");
 		return NMINX_ERROR;
 	}
-	server_ctx_t* s_cfg = (server_ctx_t*) data;
+	server_ctx_t* s_ctx = (server_ctx_t*) data;
 
 	while(is_active)
 	{
-		int result = server_process_events(s_cfg);
+		int result = server_process_events(s_ctx);
 		if(result != NMINX_OK)
 		{	// somthing wrong break loop, worker exit
 			printf("Worker process events stoped!\n");
@@ -90,40 +95,15 @@ static int main_process(void* data)
 	}
 	nminx_config_t* m_cfg = (nminx_config_t*) data;
 
-	int result = mtcp_init(m_cfg->mtcp_config_path);
-	if(result) 
-	{
-		printf("Failed to initialize mtcp\n");
-		return NMINX_ERROR;
-	}
+	signal(SIGTERM, watchdog_signal_handler);
+	signal(SIGINT, watchdog_signal_handler);
 
-	// mTcp tuning
-	//struct mtcp_conf mcfg = { 0 };
-	////mtcp_getconf(&mcfg);
-		////mcfg.num_cores = 1;
-	////mtcp_setconf(&mcfg);
-
-	// signals configure move to function
-	mtcp_register_signal(SIGTERM, watchdog_signal_handler);
-	mtcp_register_signal(SIGINT, watchdog_signal_handler);
-
-	server_ctx_t* s_cfg = server_init(m_cfg);
-	if(!s_cfg)
+	server_ctx_t* s_ctx = server_init(m_cfg);
+	if(!s_ctx)
 	{
 		printf("Failed create server!\n");
-		mtcp_destroy();
 		return NMINX_ERROR;
 	}
-
-	listen_socket_config_t* ls_cfg = listen_socket_open(m_cfg->backlog, m_cfg->ip, m_cfg->port);
-	if(!ls_cfg)
-	{
-		printf("Failed create listen socket!\n");
-		server_destroy(s_cfg);
-		mtcp_destroy();
-		return NMINX_ERROR;
-	}
-	s_cfg->l_socket = ls_cfg;
 
 	watchdog_process_config_t* workers_pool = 
 		(watchdog_process_config_t*) calloc(m_cfg->worker_pool_size, sizeof(watchdog_process_config_t));
@@ -131,9 +111,7 @@ static int main_process(void* data)
 	if(!workers_pool)
 	{
 		printf("Failed to initialize workers pool\n");
-		listen_socket_close(ls_cfg);
-		server_destroy(s_cfg);
-		mtcp_destroy();
+		server_destroy(s_ctx);
 		return NMINX_ERROR;
 	}
 
@@ -141,7 +119,7 @@ static int main_process(void* data)
 	{
 		watchdog_process_config_t* w = &workers_pool[i];
 		w->process->process = run_worker_process;
-		w->process->data = s_cfg;
+		w->process->data = s_ctx;
 		w->handler = watchdog_state_handler;
 	}
 
@@ -149,9 +127,7 @@ static int main_process(void* data)
 	{
 		printf("Failed initialize watchdog!\n");
 		free(workers_pool);
-		listen_socket_close(ls_cfg);
-		server_destroy(s_cfg);
-		mtcp_destroy();
+		server_destroy(s_ctx);
 		return NMINX_ERROR;
 	}
 
@@ -163,9 +139,7 @@ static int main_process(void* data)
 	watchdog_stop();
 
 	free(workers_pool);
-	listen_socket_close(ls_cfg);
-	server_destroy(s_cfg);
-	mtcp_destroy();
+	server_destroy(s_ctx);
 
 	return NMINX_OK;
 }

@@ -87,8 +87,8 @@ int socket_listen(socket_ctx_t* socket, int backlog)
 {
 	if(socket)
 	{
-		return (mtcp_listen(socket->io->mctx, socket->io->fd, backlog) < 0)
-			: NMINX_ERROR : NMINX_OK;
+		return (mtcp_listen(socket->io->mctx, socket->fd, backlog) < 0)
+			? NMINX_ERROR : NMINX_OK;
 	}
 	return NMINX_ERROR;
 }
@@ -102,7 +102,7 @@ socket_ctx_t* socket_accept(socket_ctx_t* socket)
 		int c_fd = mtcp_accept(io->mctx, socket->fd, NULL, NULL);
 		if(c_fd >= 0) 
 		{
-			if(c_fd >= MAX_FLOW_NUM) 
+			if(c_fd >= MAX_CONNECTIONS) 
 			{
 				printf("Invalid socket id %d.\n", c_fd);
 				errno = ENFILE;

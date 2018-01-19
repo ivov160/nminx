@@ -1,6 +1,8 @@
 #ifndef _NMINX_IO_CTX_H
 #define _NMINX_IO_CTX_H
 
+#include <mtcp_api.h>
+
 // pimpl data for io
 struct io_ctx_s 
 {

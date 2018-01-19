@@ -15,6 +15,7 @@
 #define TRUE 1
 #define FALSE 0
 
+#define MAX_CONNECTIONS 10000
 
 typedef struct
 {

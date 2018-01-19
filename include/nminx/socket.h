@@ -32,6 +32,7 @@ int socket_bind(socket_ctx_t* socket, in_addr_t ip, in_port_t port);
 int socket_listen(socket_ctx_t* socket, int backlog);
 
 socket_ctx_t* socket_accept(socket_ctx_t* socket);
+int socket_close(socket_ctx_t* socket);
 
 int socket_get_option(socket_ctx_t* sock, int level, int opt, void* data, socklen_t* len);
 int socket_set_option(socket_ctx_t* sock, int level, int opt, const void* data, socklen_t len);

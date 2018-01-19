@@ -23,7 +23,7 @@ io_ctx_t* io_init(nminx_config_t* m_cfg)
 	}
 
 	int result = mtcp_init(m_cfg->mtcp_config_path);
-	if(result) 
+	if(result < 0) 
 	{
 		printf("Failed to initialize mtcp\n");
 		return NULL;
@@ -80,7 +80,7 @@ int io_poll_ctl(io_ctx_t* io, int op, int flags, socket_ctx_t* sock)
 		ev.events = flags;
 
 		int result = mtcp_epoll_ctl(io->mctx, io->ep, op, sock->fd, &ev);
-		return result < 0 : NMINX_ERROR : NMINX_OK;
+		return result < 0 ? NMINX_ERROR : NMINX_OK;
 
 	}
 	return NMINX_ERROR;
@@ -88,8 +88,8 @@ int io_poll_ctl(io_ctx_t* io, int op, int flags, socket_ctx_t* sock)
 
 int io_poll_events(io_ctx_t* io, socket_ctx_t** s_buff, int s_buff_size)
 {
-	mtcp_epoll_event* events = (mtcp_epoll_event*) 
-		malloc(sizeof(mtcp_epoll_event) * s_buff_size);
+	struct mtcp_epoll_event* events = (struct mtcp_epoll_event*) 
+		malloc(sizeof(struct mtcp_epoll_event) * s_buff_size);
 
 	int nevents = mtcp_epoll_wait(io->mctx, io->ep, events, s_buff_size, -1);
 	if (nevents < 0) 
