@@ -35,7 +35,7 @@ io_ctx_t* io_init(nminx_config_t* m_cfg)
 		////mcfg.num_cores = 1;
 	////mtcp_setconf(&mcfg);
 
-	//mtcp_core_affinitize(core);
+	//mtcp_core_affinitize(m_cfg->mtcp_cpu);
 	
 	// create mtcp context: this will spawn an mtcp thread 
 	mtcp_io_ctx.mctx = mtcp_create_context(m_cfg->mtcp_cpu);
@@ -73,7 +73,7 @@ int io_destroy(io_ctx_t* io)
 
 int io_poll_ctl(io_ctx_t* io, int op, int flags, socket_ctx_t* sock)
 {
-	if(!io || !sock)
+	if(io && sock)
 	{
 		struct mtcp_epoll_event ev = { 0 };
 		ev.data.ptr = (void*) sock;
@@ -112,6 +112,5 @@ int io_poll_events(io_ctx_t* io, socket_ctx_t** s_buff, int s_buff_size)
 	}
 	
 	free(events);
-	// convert offset to count
-	return s_buff_offset + 1;
+	return s_buff_offset;
 }

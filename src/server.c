@@ -13,6 +13,12 @@
 // In plan for continue need custom memory allocation
 static server_ctx_t server_ctx = { 0 };
 
+static int accept_connection_handler(socket_ctx_t* socket)
+{
+
+	return NMINX_ERROR;
+}
+
 server_ctx_t* server_init(nminx_config_t* m_cfg)
 {
 	server_ctx_t* s_ctx = &server_ctx;
@@ -52,14 +58,16 @@ server_ctx_t* server_init(nminx_config_t* m_cfg)
 		return NULL;
 	}
 
-	//if(io_poll_ctl(io_ctx, IO_CTL_ADD, IO_EVENT_READ, l_sock) == NMINX_ERROR)
-	//{
-		//printf("Failed attach read event to socket!\n");
-		//socket_destroy(l_sock);
-		//io_destroy(io_ctx);
-		//return NULL;
-	//}
+	if(io_poll_ctl(io_ctx, IO_CTL_ADD, IO_EVENT_READ, l_sock) == NMINX_ERROR)
+	{
+		printf("Failed attach read event to socket, error: %s!\n", strerror(errno));
+		socket_destroy(l_sock);
+		io_destroy(io_ctx);
+		return NULL;
+	}
 	
+	l_sock->read = accept_connection_handler;
+
 	s_ctx->m_cfg = m_cfg;
 	s_ctx->io_ctx = io_ctx;
 	s_ctx->sockets[0] = l_sock;

@@ -46,6 +46,10 @@ socket_ctx_t* socket_create(io_ctx_t* io)
 			return NULL;
 		}
 
+		sock->fd = s_fd;
+		sock->flags = 0x00;
+		sock->io = io;
+
 		sock->read = socket_stub_action;
 		sock->write = socket_stub_action;
 		sock->close = socket_stub_action;

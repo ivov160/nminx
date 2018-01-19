@@ -19,9 +19,7 @@
 
 typedef struct
 {
-	char* mtcp_config_path;
 	uint32_t wdt_timeout_ms;
-
 	uint32_t worker_pool_size;
 
 	in_addr_t ip;
@@ -30,6 +28,7 @@ typedef struct
 
 	int mtcp_cpu;
 	int mtcp_max_events;
+	char* mtcp_config_path;
 
 } nminx_config_t;
 

@@ -10,7 +10,9 @@
 #include <nminx/server.h>
 #include <nminx/watchdog.h>
 
-static int is_active = FALSE;
+#include <net/if_arp.h>
+
+static int is_active = TRUE;
 
 static int default_mtcp_cpu = 0;
 static uint32_t defailt_wdt_timeout = 1000;
@@ -20,6 +22,9 @@ static char* default_mtcp_config_path = "config/nminx.conf";
 
 //static int default_mtcp_max_events = 30000; //MAX_FLOW_NUM * 3 see mtcp example server
 static int default_mtcp_max_events = MAX_CONNECTIONS; //MAX_FLOW_NUM * 3 see mtcp example server
+
+static char* default_ip = "0.0.0.0";
+static int default_port = 8080;
 
 static void worker_signal_handler(int sig)
 {
@@ -144,33 +149,75 @@ static int main_process(void* data)
 	return NMINX_OK;
 }
 
+static int debug_process(void* data)
+{	
+	printf("debug_process started\n");
+
+	if(!data)
+	{
+		printf("Main config is NULL\n");
+		return NMINX_ERROR;
+	}
+	nminx_config_t* m_cfg = (nminx_config_t*) data;
+
+	signal(SIGTERM, worker_signal_handler);
+	signal(SIGINT, worker_signal_handler);
+
+	server_ctx_t* s_ctx = server_init(m_cfg);
+	if(!s_ctx)
+	{
+		printf("Failed create server!\n");
+		return NMINX_ERROR;
+	}
+
+	while(is_active)
+	{
+		int result = server_process_events(s_ctx);
+		if(result != NMINX_OK)
+		{	// somthing wrong break loop, worker exit
+			printf("Worker process events stoped!\n");
+			break;
+		}
+	}
+
+	server_destroy(s_ctx);
+
+	return NMINX_OK;
+}
+
+
 int main(int argc, char* argv[]) 
 {
 	// initialize application config
 	nminx_config_t m_cfg = { 0 };
 
-	m_cfg.mtcp_config_path = default_mtcp_config_path;
+	m_cfg.ip = inet_addr(default_ip);
+	m_cfg.port = htons(default_port);
 	m_cfg.backlog = default_backlog_size;
+
 	m_cfg.mtcp_cpu = default_mtcp_cpu;
 	m_cfg.mtcp_max_events = default_mtcp_max_events;
+	m_cfg.mtcp_config_path = default_mtcp_config_path;
 
 	m_cfg.wdt_timeout_ms = defailt_wdt_timeout;
 	m_cfg.worker_pool_size = default_worker_pool_size;
 
-	// initialize wdt_process
-	process_config_t mp_cfg = { 0 };
-	mp_cfg.process = main_process;
-	mp_cfg.data = (void*) &m_cfg;
+	//// initialize wdt_process
+	//process_config_t mp_cfg = { 0 };
+	//mp_cfg.process = main_process;
+	//mp_cfg.data = (void*) &m_cfg;
 
-	// initialize daemon 
-	daemon_config_t cfg = { 0 };
-	cfg.process = &mp_cfg;
+	//// initialize daemon 
+	//daemon_config_t cfg = { 0 };
+	//cfg.process = &mp_cfg;
 
-	if(process_daemon(&cfg) != NMINX_OK)
-	{
-		printf("Failed start daemon process\n");
-		return -1;
-	}
+	//if(process_daemon(&cfg) != NMINX_OK)
+	//{
+		//printf("Failed start daemon process\n");
+		//return -1;
+	//}
+	//
+	//return 0;
 
-	return 0;
+	return debug_process((void*) &m_cfg);
 }
