@@ -13,11 +13,13 @@ set(VERSION_PATCH 0)
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 # Settings
-#include(settings)
+#include(nginx)
 
 find_package(netmap REQUIRED)
 find_package(Numa REQUIRED)
 find_package(mTCP REQUIRED)
+
+#add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/nginx)
 
 # Add header location
 include_directories(
@@ -26,11 +28,13 @@ include_directories(
 	${MTCP_INCLUDE_DIR}
 	${NUMA_INCLUDE_DIR}
 	${CMAKE_SOURCE_DIR}/include
+	${CMAKE_SOURCE_DIR}/third_party/nginx/objs
+	${CMAKE_SOURCE_DIR}/third_party/nginx/src/os/unix
 )
 
 file(GLOB_RECURSE app_src RELATIVE ${CMAKE_SOURCE_DIR} "src/*")
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -pthread")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -pthread ")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_C_FLAGS}")
 
 ## Source files
