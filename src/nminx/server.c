@@ -1,5 +1,6 @@
 #include <nminx/server.h>
-#include <nminx/connection.h>
+//#include <nminx/connection.h>
+#include <nminx/http_connection.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,7 +15,7 @@
 // In plan for continue need custom memory allocation
 static server_ctx_t server_ctx = { 0 };
 
-static int server_accept_socket_handler(socket_ctx_t* socket);
+//static int server_accept_socket_handler(socket_ctx_t* socket);
 static int server_stub_socket_handler(socket_ctx_t* socket);
 static int server_close_socket_handler(socket_ctx_t* socket);
 
@@ -68,9 +69,9 @@ server_ctx_t* server_init(nminx_config_t* m_cfg)
 	}
 	
 	l_sock->data = (void*) s_ctx;
-	l_sock->read = server_accept_socket_handler;
-	l_sock->write = server_stub_socket_handler;
-	l_sock->close = server_stub_socket_handler;
+	l_sock->read_handler = http_connection_accept;
+	l_sock->write_handler = server_stub_socket_handler;
+	l_sock->close_handler = server_stub_socket_handler;
 	//l_sock->close = server_close_socket_handler;
 
 	s_ctx->m_cfg = m_cfg;
@@ -183,6 +184,14 @@ int server_process_events(server_ctx_t* s_ctx)
 	return NMINX_OK;
 }
 
+int server_add_socket(server_ctx_t* s_ctx, socket_ctx_t* socket)
+{
+	///@todo collision checking
+	s_ctx->sockets[socket->fd] = socket;
+
+	return NMINX_OK;
+}
+
 int server_close_socket(server_ctx_t* s_ctx, socket_ctx_t* socket)
 {
 	socket_close_action(socket);
@@ -195,8 +204,12 @@ int server_stub_socket_handler(socket_ctx_t* socket)
 	return NMINX_OK;
 }
 
+/*
 int server_accept_socket_handler(socket_ctx_t* socket)
 {
+	server_ctx_t* s_ctx = (server_ctx_t*) socket->data;
+	nminx_config_t* m_cfg = s_ctx->m_cfg;
+
 	socket_ctx_t* c_socket = socket_accept(socket);
 	if(!c_socket)
 	{
@@ -204,22 +217,21 @@ int server_accept_socket_handler(socket_ctx_t* socket)
 		return NMINX_ERROR;
 	}
 
-	connection_ctx_t* conn = (connection_ctx_t*)
-		calloc(1, sizeof(connection_ctx_t));
 
-	if(!conn)
+	http_connection_ctx_t* hc = http_connection_create(m_cfg);
+	if(!hc)
 	{
-		printf("Failed allocate memmory for connection!\n");
-		socket_close_action(c_socket);
-		socket_destroy(c_socket);
+		printf("Failed create http_connection!\n");
+		socket_close(c_socket);
 		return NMINX_ERROR;
 	}
-	conn->flushed = 1;
 
-	c_socket->data = (void*) conn;
-	c_socket->read = connection_read_handler;
-	c_socket->write = connection_write_handler;
-	c_socket->close = connection_close_handler;
+	c_socket->data = hc;
+	c_socket->cleanup_handler = http_connection_cleanup_handler;
+
+	c_socket->read_handler = http_connection_read_handler;
+	c_socket->write_handler = http_connection_write_handler;
+	c_socket->close_handler = http_connection_close_handler;
 
 	if(io_poll_ctl(c_socket->io, IO_CTL_ADD, IO_EVENT_READ, c_socket) == NMINX_ERROR)
 	{
@@ -236,7 +248,6 @@ int server_accept_socket_handler(socket_ctx_t* socket)
 	return NMINX_OK;
 }
 
-/*
 int server_close_socket_handler(socket_ctx_t* socket)
 {
 	server_ctx_t* s_ctx = (server_ctx_t*) socket->data;

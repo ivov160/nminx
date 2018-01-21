@@ -3,6 +3,11 @@
  * Copyright (C) Nginx, Inc.
  */
 
+#include <nginx/ngx_config.h>
+#include <nginx/ngx_core.h>
+#include <nginx/ngx_http.h>
+
+#include <nminx/http_connection.h>
 
 #ifndef _NGX_HTTP_REQUEST_H_INCLUDED_
 #define _NGX_HTTP_REQUEST_H_INCLUDED_
@@ -368,7 +373,7 @@ typedef void (*ngx_http_event_handler_pt)(ngx_http_request_t *r);
 struct ngx_http_request_s {
     uint32_t                          signature;         /* "HTTP" */
 
-    //ngx_connection_t                 *connection;
+	ngx_connection_t                 *connection;
 
     //void                            **ctx;
     //void                            **main_conf;
@@ -448,7 +453,7 @@ struct ngx_http_request_s {
     ngx_http_cleanup_t               *cleanup;
 
     unsigned                          count:16;
-    unsigned                          subrequests:8;
+	unsigned                          subrequests:8;
     unsigned                          blocked:8;
 
     unsigned                          aio:1;

@@ -26,8 +26,8 @@ include_directories(
 	${MTCP_INCLUDE_DIR}
 	${NUMA_INCLUDE_DIR}
 	${CMAKE_SOURCE_DIR}/include
-	${CMAKE_SOURCE_DIR}/third_party/nginx/src/os/unix
-	${CMAKE_SOURCE_DIR}/third_party/nginx/objs
+	${CMAKE_SOURCE_DIR}/third_party/nginx-1.13.8/src/os/unix
+	${CMAKE_SOURCE_DIR}/third_party/nginx-1.13.8/objs
 )
 
 file(GLOB_RECURSE app_src RELATIVE ${CMAKE_SOURCE_DIR} "src/*")

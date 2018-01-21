@@ -3,12 +3,11 @@
 
 #include <nminx/nminx.h>
 
-#include <arpa/inet.h>
-
 typedef struct io_ctx_s io_ctx_t;
 
 typedef struct socket_ctx_s socket_ctx_t;
-typedef int (*accpet_handler)(struct socket_ctx_s*);
+typedef int (*event_handler_t)(struct socket_ctx_s*);
+typedef int (*cleanup_handler_t)(void*);
 
 struct socket_ctx_s
 {
@@ -16,11 +15,13 @@ struct socket_ctx_s
 	int flags;
 
 	io_ctx_t* io;
-	void* data;
 
-	accpet_handler read;
-	accpet_handler write;
-	accpet_handler close;
+	void* data;
+	cleanup_handler_t cleanup_handler;
+
+	event_handler_t read_handler;
+	event_handler_t write_handler;
+	event_handler_t close_handler;
 };
 
 
@@ -36,6 +37,10 @@ int socket_close(socket_ctx_t* socket);
 int socket_get_option(socket_ctx_t* sock, int level, int opt, void* data, socklen_t* len);
 int socket_set_option(socket_ctx_t* sock, int level, int opt, const void* data, socklen_t len);
 
+/**
+ * @todo	incapsulate io error handling to socket io functions
+ *			example in socket_read
+ */
 ssize_t
 socket_read(socket_ctx_t* socket, char *buf, size_t len);
 
@@ -54,8 +59,8 @@ int
 socket_writev(socket_ctx_t* socket, const struct iovec *iov, int numIOV);
 
 // macros for passing socket to self handlers
-#define socket_read_action(sock) sock->read(sock)
-#define socket_write_action(sock) sock->write(sock)
-#define socket_close_action(sock) sock->close(sock)
+#define socket_read_action(sock) sock->read_handler(sock)
+#define socket_write_action(sock) sock->write_handler(sock)
+#define socket_close_action(sock) sock->close_handler(sock)
 
 #endif //_NMINX_SOCKET_H

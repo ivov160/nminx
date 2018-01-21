@@ -50,9 +50,12 @@ socket_ctx_t* socket_create(io_ctx_t* io)
 		sock->flags = 0x00;
 		sock->io = io;
 
-		sock->read = socket_stub_action;
-		sock->write = socket_stub_action;
-		sock->close = socket_close;
+		sock->read_handler = socket_stub_action;
+		sock->write_handler = socket_stub_action;
+		sock->close_handler = socket_close;
+
+		sock->data = NULL;
+		sock->cleanup_handler = NULL;
 
 		return sock;
 	}
@@ -64,6 +67,12 @@ int socket_destroy(socket_ctx_t* sock)
 	if(sock)
 	{	
 		socket_close(sock);
+
+		if(sock->cleanup_handler)
+		{
+			sock->cleanup_handler(sock->data);
+		}
+
 		free(sock);
 	}
 	return NMINX_OK;
@@ -134,9 +143,12 @@ socket_ctx_t* socket_accept(socket_ctx_t* socket)
 			c_socket->fd = c_fd;
 			c_socket->flags = 0x00;
 
-			c_socket->read = socket_stub_action;
-			c_socket->write = socket_stub_action;
-			c_socket->close = socket_close;
+			c_socket->read_handler = socket_stub_action;
+			c_socket->write_handler = socket_stub_action;
+			c_socket->close_handler = socket_close;
+
+			c_socket->data = NULL;
+			c_socket->cleanup_handler = NULL;
 
 			return c_socket;
 		} 
@@ -189,7 +201,16 @@ socket_read(socket_ctx_t* socket, char *buf, size_t len)
 {
 	if(socket)
 	{
-		return mtcp_read(socket->io->mctx, socket->fd, buf, len);
+		int result = mtcp_read(socket->io->mctx, socket->fd, buf, len);
+		if(result == 0)
+		{
+			if(errno != EAGAIN)
+			{
+				return NMINX_ERROR;
+			}
+			return NMINX_AGAIN;
+		}
+		return result;
 	}
 	return 0;
 }

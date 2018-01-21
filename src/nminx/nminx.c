@@ -3,8 +3,6 @@
 #include <nminx/process.h>
 #include <nminx/watchdog.h>
 
-#include <net/if_arp.h>
-
 static int is_active = TRUE;
 
 static int default_mtcp_cpu = 0;
@@ -18,6 +16,11 @@ static int default_mtcp_max_events = MAX_CONNECTIONS; //MAX_FLOW_NUM * 3 see mtc
 
 static char* default_ip = "0.0.0.0";
 static int default_port = 8080;
+
+static uint32_t default_connection_pool_size = NGX_DEFAULT_POOL_SIZE;
+static uint32_t default_connection_buffer_size = 1024;
+
+static uint32_t default_request_pool_size = NGX_DEFAULT_POOL_SIZE;
 
 static void worker_signal_handler(int sig)
 {
@@ -191,6 +194,11 @@ int main(int argc, char* argv[])
 	m_cfg.ip = inet_addr(default_ip);
 	m_cfg.port = htons(default_port);
 	m_cfg.backlog = default_backlog_size;
+
+	m_cfg.connection_pool_size = default_connection_pool_size;
+	m_cfg.connection_buffer_size = default_connection_buffer_size;
+
+	m_cfg.request_pool_size = default_request_pool_size;
 
 	m_cfg.mtcp_cpu = default_mtcp_cpu;
 	m_cfg.mtcp_max_events = default_mtcp_max_events;

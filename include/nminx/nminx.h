@@ -19,6 +19,12 @@
 
 typedef struct
 {
+	//uint32_t connection_memmory_size;
+	uint32_t connection_pool_size;
+	uint32_t connection_buffer_size;
+
+	uint32_t request_pool_size;
+
 	uint32_t wdt_timeout_ms;
 	uint32_t worker_pool_size;
 
