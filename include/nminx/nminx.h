@@ -1,29 +1,21 @@
 #ifndef _NMINX_H
 #define _NMINX_H
 
-#include <nminx/config.h>
+//#include <nginx/ngx_config.h>
+#include <nginx/ngx_core.h>
 
-typedef struct ngx_pool_s ngx_pool_t;
-typedef struct ngx_buf_s  ngx_buf_t;
-typedef struct ngx_chain_s ngx_chain_t;
-
-#define  NMINX_OK          0
-#define  NMINX_ERROR      -1
-#define  NMINX_AGAIN      -2
-#define  NMINX_BUSY       -3
-#define  NMINX_DONE       -4
-#define  NMINX_DECLINED   -5
-#define  NMINX_ABORT      -6
-
-#define LF     (u_char) '\n'
-#define CR     (u_char) '\r'
-#define CRLF   "\r\n"
+#define  NMINX_OK         NGX_OK
+#define  NMINX_ERROR      NGX_ERROR
+#define  NMINX_AGAIN      NGX_AGAIN
+#define  NMINX_BUSY       NGX_BUSY
+#define  NMINX_DONE       NGX_DONE
+#define  NMINX_DECLINED   NGX_DECLINED
+#define  NMINX_ABORT      NGX_ABORT
 
 #define TRUE 1
 #define FALSE 0
 
 #define MAX_CONNECTIONS 10000
-
 
 typedef struct
 {
