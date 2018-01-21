@@ -33,7 +33,7 @@ int watchdog_stop();
 int watchdog_signal_all(int sig);
 int watchdog_signal_one(int sig, pid_t pid);
 
-int watchdog_exec(int *is_alive, uint32_t ms_timeout);
+int watchdog_exec(uint32_t ms_timeout);
 int watchdog_poll(process_state_t* pstate);
 
 

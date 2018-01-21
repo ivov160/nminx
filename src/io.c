@@ -30,7 +30,7 @@ io_ctx_t* io_init(nminx_config_t* m_cfg)
 	}
 
 	// mTcp tuning
-	//struct mtcp_conf mcfg = { 0 };
+	////struct mtcp_conf mcfg = { 0 };
 	////mtcp_getconf(&mcfg);
 		////mcfg.num_cores = 1;
 	////mtcp_setconf(&mcfg);

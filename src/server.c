@@ -1,4 +1,5 @@
 #include <nminx/server.h>
+#include <nminx/connection.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,11 +14,11 @@
 // In plan for continue need custom memory allocation
 static server_ctx_t server_ctx = { 0 };
 
-static int accept_connection_handler(socket_ctx_t* socket)
-{
+static int server_accept_socket_handler(socket_ctx_t* socket);
+static int server_stub_socket_handler(socket_ctx_t* socket);
+static int server_close_socket_handler(socket_ctx_t* socket);
 
-	return NMINX_ERROR;
-}
+static int server_close_socket(server_ctx_t* s_ctx, socket_ctx_t* socket);
 
 server_ctx_t* server_init(nminx_config_t* m_cfg)
 {
@@ -60,13 +61,17 @@ server_ctx_t* server_init(nminx_config_t* m_cfg)
 
 	if(io_poll_ctl(io_ctx, IO_CTL_ADD, IO_EVENT_READ, l_sock) == NMINX_ERROR)
 	{
-		printf("Failed attach read event to socket, error: %s!\n", strerror(errno));
+		printf("Failed attach read event to socket!\n");
 		socket_destroy(l_sock);
 		io_destroy(io_ctx);
 		return NULL;
 	}
 	
-	l_sock->read = accept_connection_handler;
+	l_sock->data = (void*) s_ctx;
+	l_sock->read = server_accept_socket_handler;
+	l_sock->write = server_stub_socket_handler;
+	l_sock->close = server_stub_socket_handler;
+	//l_sock->close = server_close_socket_handler;
 
 	s_ctx->m_cfg = m_cfg;
 	s_ctx->io_ctx = io_ctx;
@@ -122,18 +127,51 @@ int server_process_events(server_ctx_t* s_ctx)
 		if(sock->flags & IO_EVENT_ERROR)
 		{
 			printf("IO_EVENT_ERROR\n");
-			int result = socket_close_action(sock);
+			
+			int err = 0;
+			socklen_t len = sizeof(err);
+
+			int result = socket_get_option(sock, SOL_SOCKET, SO_ERROR, (void*) &err, &len);
+			if(result == NMINX_OK)
+			{
+				if(err != ETIMEDOUT)
+				{
+					printf("Error on socket %d, error: %s\n", 
+							sock->fd, strerror(err));
+				}
+				else
+				{
+					printf("Timeout on socket %d\n", sock->fd);
+				}
+			}
+			else
+			{
+				printf("socket_get_option error\n");
+			}
+			server_close_socket(s_ctx, sock);
 		}
 		else if(sock->flags & IO_EVENT_READ)
 		{
 			printf("IO_EVENT_READ\n");
 			int result = socket_read_action(sock);
-			// result handling
+			printf("socket_read_action: %d\n", result);
+
+			if(result < NMINX_OK)
+			{
+				if(result != NMINX_AGAIN)
+				{
+					printf("Failed read date from socket %d, err: %s\n", 
+							sock->fd, strerror(errno));
+
+					server_close_socket(s_ctx, sock);
+				}
+			}
 		}
 		else if(sock->flags & IO_EVENT_WRITE)
 		{
 			printf("IO_EVENT_WRITE\n");
 			int result = socket_write_action(sock);
+			printf("socket_write_action: %d\n", result);
 			// result handling
 		}
 		else
@@ -144,4 +182,67 @@ int server_process_events(server_ctx_t* s_ctx)
 
 	return NMINX_OK;
 }
+
+int server_close_socket(server_ctx_t* s_ctx, socket_ctx_t* socket)
+{
+	socket_close_action(socket);
+	s_ctx->sockets[socket->fd] = NULL;
+	return NMINX_OK;
+}
+
+int server_stub_socket_handler(socket_ctx_t* socket)
+{
+	return NMINX_OK;
+}
+
+int server_accept_socket_handler(socket_ctx_t* socket)
+{
+	socket_ctx_t* c_socket = socket_accept(socket);
+	if(!c_socket)
+	{
+		printf("Failed accept client!\n");
+		return NMINX_ERROR;
+	}
+
+	connection_ctx_t* conn = (connection_ctx_t*)
+		calloc(1, sizeof(connection_ctx_t));
+
+	if(!conn)
+	{
+		printf("Failed allocate memmory for connection!\n");
+		socket_close_action(c_socket);
+		socket_destroy(c_socket);
+		return NMINX_ERROR;
+	}
+	conn->flushed = 1;
+
+	c_socket->data = (void*) conn;
+	c_socket->read = connection_read_handler;
+	c_socket->write = connection_write_handler;
+	c_socket->close = connection_close_handler;
+
+	if(io_poll_ctl(c_socket->io, IO_CTL_ADD, IO_EVENT_READ, c_socket) == NMINX_ERROR)
+	{
+		printf("Failed attach read event to socket!\n");
+		free(conn);
+		socket_close_action(c_socket);
+		socket_destroy(c_socket);
+		return NMINX_ERROR;
+	}
+
+	server_ctx_t* s_ctx = (server_ctx_t*) socket->data;
+	s_ctx->sockets[c_socket->fd] = c_socket;
+
+	return NMINX_OK;
+}
+
+/*
+int server_close_socket_handler(socket_ctx_t* socket)
+{
+	server_ctx_t* s_ctx = (server_ctx_t*) socket->data;
+	server_destroy(s_ctx);
+	return NMINX_OK;
+}
+*/
+
 

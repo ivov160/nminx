@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <signal.h>
 
 #include <error.h>
@@ -8,6 +9,7 @@
 
 #include <nminx/nminx.h>
 #include <nminx/server.h>
+#include <nminx/process.h>
 #include <nminx/watchdog.h>
 
 #include <net/if_arp.h>
@@ -85,6 +87,7 @@ static int run_worker_process(void* data)
 	sigdelset(&sig_set, SIGTERM);
 	sigprocmask(SIG_SETMASK, &sig_set, NULL);
 	signal(SIGTERM, worker_signal_handler);
+	signal(SIGINT, worker_signal_handler);
 
 	return worker_process(data);
 }
@@ -120,11 +123,14 @@ static int main_process(void* data)
 		return NMINX_ERROR;
 	}
 
+	process_config_t w_ctx = { 0 };
+	w_ctx.process = run_worker_process;
+	w_ctx.data = (void*) s_ctx;
+
 	for(uint32_t i = 0; i < m_cfg->worker_pool_size; ++i)
 	{
 		watchdog_process_config_t* w = &workers_pool[i];
-		w->process->process = run_worker_process;
-		w->process->data = s_ctx;
+		w->process = &w_ctx;
 		w->handler = watchdog_state_handler;
 	}
 
@@ -138,7 +144,7 @@ static int main_process(void* data)
 
 	while(is_active)
 	{
-		watchdog_exec(&is_active, m_cfg->wdt_timeout_ms);
+		watchdog_exec(m_cfg->wdt_timeout_ms);
 	}
 	///@todo wait childrens before destroy all configs
 	watchdog_stop();
@@ -202,7 +208,7 @@ int main(int argc, char* argv[])
 	m_cfg.wdt_timeout_ms = defailt_wdt_timeout;
 	m_cfg.worker_pool_size = default_worker_pool_size;
 
-	//// initialize wdt_process
+	// initialize wdt_process
 	//process_config_t mp_cfg = { 0 };
 	//mp_cfg.process = main_process;
 	//mp_cfg.data = (void*) &m_cfg;
@@ -216,7 +222,7 @@ int main(int argc, char* argv[])
 		//printf("Failed start daemon process\n");
 		//return -1;
 	//}
-	//
+	
 	//return 0;
 
 	return debug_process((void*) &m_cfg);

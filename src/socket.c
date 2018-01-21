@@ -52,7 +52,7 @@ socket_ctx_t* socket_create(io_ctx_t* io)
 
 		sock->read = socket_stub_action;
 		sock->write = socket_stub_action;
-		sock->close = socket_stub_action;
+		sock->close = socket_close;
 
 		return sock;
 	}
@@ -130,9 +130,13 @@ socket_ctx_t* socket_accept(socket_ctx_t* socket)
 				return NULL;
 			}
 
+			c_socket->io = io;
+			c_socket->fd = c_fd;
+			c_socket->flags = 0x00;
+
 			c_socket->read = socket_stub_action;
 			c_socket->write = socket_stub_action;
-			c_socket->close = socket_stub_action;
+			c_socket->close = socket_close;
 
 			return c_socket;
 		} 
@@ -180,14 +184,14 @@ int socket_set_option(socket_ctx_t* sock, int level, int opt, const void* data, 
 	return NMINX_ERROR;
 }
 
-inline ssize_t
+ssize_t
 socket_read(socket_ctx_t* socket, char *buf, size_t len)
 {
 	if(socket)
 	{
 		return mtcp_read(socket->io->mctx, socket->fd, buf, len);
 	}
-	return NMINX_ERROR;
+	return 0;
 }
 
 ssize_t
@@ -197,7 +201,7 @@ socket_recv(socket_ctx_t* socket, char *buf, size_t len, int flags)
 	{
 		return mtcp_recv(socket->io->mctx, socket->fd, buf, len, flags);
 	}
-	return NMINX_ERROR;
+	return 0;
 }
 
 /* readv should work in atomic */
@@ -208,7 +212,7 @@ socket_readv(socket_ctx_t* socket, const struct iovec *iov, int numIOV)
 	{
 		return mtcp_readv(socket->io->mctx, socket->fd, iov, numIOV);
 	}
-	return NMINX_ERROR;
+	return 0;
 }
 
 ssize_t
@@ -218,7 +222,7 @@ socket_write(socket_ctx_t* socket, const char *buf, size_t len)
 	{
 		return mtcp_write(socket->io->mctx, socket->fd, buf, len);
 	}
-	return NMINX_ERROR;
+	return 0;
 }
 
 /* writev should work in atomic */
@@ -229,7 +233,7 @@ socket_writev(socket_ctx_t* socket, const struct iovec *iov, int numIOV)
 	{
 		return mtcp_writev(socket->io->mctx, socket->fd, iov, numIOV);
 	}
-	return NMINX_ERROR;
+	return 0;
 }
 
 

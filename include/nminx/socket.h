@@ -10,14 +10,13 @@ typedef struct io_ctx_s io_ctx_t;
 typedef struct socket_ctx_s socket_ctx_t;
 typedef int (*accpet_handler)(struct socket_ctx_s*);
 
-///@todo	think abount io_s and hold pointer to it
-///			io_s - mtcp io data mtcp_ctx and mtcp_epoll descriptor
 struct socket_ctx_s
 {
 	int fd;
 	int flags;
 
 	io_ctx_t* io;
+	void* data;
 
 	accpet_handler read;
 	accpet_handler write;
@@ -37,7 +36,7 @@ int socket_close(socket_ctx_t* socket);
 int socket_get_option(socket_ctx_t* sock, int level, int opt, void* data, socklen_t* len);
 int socket_set_option(socket_ctx_t* sock, int level, int opt, const void* data, socklen_t len);
 
-inline ssize_t
+ssize_t
 socket_read(socket_ctx_t* socket, char *buf, size_t len);
 
 ssize_t

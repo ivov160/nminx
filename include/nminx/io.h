@@ -21,6 +21,10 @@ enum io_event_flag
 	IO_EVENT_READ = 0x001,
 	IO_EVENT_WRITE = 0x004,
 	IO_EVENT_ERROR = 0x008,
+	IO_EVENT_HUP = 0x010,
+	IO_EVENT_RDHUP = 0x2000,
+	IO_EVENT_ONESHOT = (1 << 30), 
+	IO_EVENT_ET = (1 << 31)
 };
 
 io_ctx_t* io_init(nminx_config_t* cfg);

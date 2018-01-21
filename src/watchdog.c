@@ -111,52 +111,50 @@ int watchdog_signal_one(int sig, pid_t pid)
 	return NMINX_OK;
 }
 
-int watchdog_exec(int* is_alive, uint32_t ms_timeout)
+int watchdog_exec(uint32_t ms_timeout)
 {
 	process_state_t p_state;
-	while(*is_alive)
+	int result = watchdog_poll(&p_state);
+
+	if(result == NMINX_ERROR)
 	{
-		int result = watchdog_poll(&p_state);
-		if(result == NMINX_ERROR)
+		return NMINX_ERROR;
+	}
+
+	if(result == NMINX_AGAIN && w_config.size > 0)
+	{
+		struct timespec ts;
+		ts.tv_sec = ms_timeout / 1000;
+		ts.tv_nsec = (ms_timeout % 1000) * 1000000;
+		nanosleep(&ts, NULL);
+	}
+	else
+	{
+		watchdog_process_info_t* pi = watchdog_find_process(p_state.pid);
+		if(!pi)
 		{
+			printf("watchdog_exec not found child process pid: %d\n", p_state.pid);
 			return NMINX_ERROR;
 		}
 
-		if(result == NMINX_AGAIN && w_config.size > 0)
+		watchdog_process_config_t* wdc = pi->wd_config;
+		if(wdc->handler)
 		{
-			struct timespec ts;
-			ts.tv_sec = ms_timeout / 1000;
-			ts.tv_nsec = (ms_timeout % 1000) * 1000000;
-			nanosleep(&ts, NULL);
-		}
-		else
-		{
-			watchdog_process_info_t* pi = watchdog_find_process(p_state.pid);
-			if(!pi)
-			{
-				printf("watchdog_exec not found child process pid: %d\n", p_state.pid);
-				return NMINX_ERROR;
+			int cmd = wdc->handler(&p_state, wdc->data);
+			if(cmd == NMINX_AGAIN)
+			{	// restart watched process
+				pid_t c_pid = process_spawn(wdc->process);
+				if(c_pid == -1)
+				{
+					printf("Failed start child porcess\n");
+					return NMINX_ERROR;
+				}
+				//printf("wdt pid change old: %d, new: %d\n", pi->pid, c_pid);
+				pi->pid = c_pid;
 			}
-
-			watchdog_process_config_t* wdc = pi->wd_config;
-			if(wdc->handler)
-			{
-				int cmd = wdc->handler(&p_state, wdc->data);
-				if(cmd == NMINX_AGAIN)
-				{	// restart watched process
-					pid_t c_pid = process_spawn(wdc->process);
-					if(c_pid == -1)
-					{
-						printf("Failed start child porcess\n");
-						return NMINX_ERROR;
-					}
-					//printf("wdt pid change old: %d, new: %d\n", pi->pid, c_pid);
-					pi->pid = c_pid;
-				}
-				else
-				{	// stop watching process
-					pi->pid = 0;
-				}
+			else
+			{	// stop watching process
+				pi->pid = 0;
 			}
 		}
 	}
