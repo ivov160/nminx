@@ -1,7 +1,7 @@
 #ifndef _NMINX_H
 #define _NMINX_H
 
-//#include <nginx/ngx_config.h>
+#include <nginx/ngx_config.h>
 #include <nginx/ngx_core.h>
 
 #define  NMINX_OK         NGX_OK

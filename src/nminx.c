@@ -1,12 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <signal.h>
-
-#include <error.h>
-#include <errno.h>
-#include <string.h>
-
 #include <nminx/nminx.h>
 #include <nminx/server.h>
 #include <nminx/process.h>
