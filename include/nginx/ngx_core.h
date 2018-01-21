@@ -8,7 +8,6 @@
 #ifndef _NGX_CORE_H_INCLUDED_
 #define _NGX_CORE_H_INCLUDED_
 
-
 #include <nginx/ngx_config.h>
 
 
@@ -41,14 +40,14 @@ typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 #define  NGX_ABORT      -6
 
 
-//#include <ngx_errno.h>
+#include <nginx/ngx_errno.h>
 //#include <ngx_atomic.h>
 //#include <ngx_thread.h>
 #include <nginx/ngx_rbtree.h>
 //#include <ngx_time.h>
 //#include <ngx_socket.h>
 #include <nginx/ngx_string.h>
-//#include <ngx_files.h>
+#include <nginx/ngx_files.h>
 //#include <ngx_shmem.h>
 //#include <ngx_process.h>
 //#include <ngx_user.h>
@@ -57,12 +56,12 @@ typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 //#include <ngx_parse_time.h>
 //#include <ngx_log.h>
 #include <nginx/ngx_alloc.h>
-//#include <ngx_palloc.h>
-//#include <ngx_buf.h>
+#include <nginx/ngx_palloc.h>
+#include <nginx/ngx_buf.h>
 //#include <ngx_queue.h>
-//#include <ngx_array.h>
-//#include <ngx_list.h>
-//#include <ngx_hash.h>
+#include <nginx/ngx_array.h>
+#include <nginx/ngx_list.h>
+#include <nginx/ngx_hash.h>
 //#include <ngx_file.h>
 //#include <ngx_crc.h>
 //#include <ngx_crc32.h>
@@ -71,7 +70,7 @@ typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 //#include <ngx_regex.h>
 //#endif
 //#include <ngx_radix_tree.h>
-//#include <ngx_times.h>
+#include <nginx/ngx_times.h>
 //#include <ngx_rwlock.h>
 //#include <ngx_shmtx.h>
 //#include <ngx_slab.h>
@@ -85,7 +84,7 @@ typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 //#include <ngx_conf_file.h>
 //#include <ngx_module.h>
 //#include <ngx_open_file_cache.h>
-//#include <ngx_os.h>
+#include <nginx/ngx_os.h>
 //#include <ngx_connection.h>
 //#include <ngx_syslog.h>
 //#include <ngx_proxy_protocol.h>
