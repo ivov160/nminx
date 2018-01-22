@@ -6,15 +6,20 @@
 #  also defined, but not for general use are
 #  MTCP_LIBRARY, where to find the mTCP library.
 
+set(MTCP_FOUND FALSE)
+set(MTCP_LIBRARY)
+set(MTCP_INCLUDE_DIR)
+
 FIND_PATH(MTCP_INCLUDE_DIR 
 	NAMES 
 		mtcp_api.h 
 		mtcp_epoll.h
 	PATHS
-		/usr/local/include
 		/usr/include
+		/usr/local/include
 	DOC "mTCP include directory path"
 )
+message("HZ: ${MTCP_INCLUDE_DIR}")
 
 FIND_LIBRARY(MTCP_LIBRARY
     NAMES 

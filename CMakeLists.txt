@@ -9,14 +9,74 @@ set(VERSION_MAJOR 0)
 set(VERSION_MINOR 0)
 set(VERSION_PATCH 0)
 
+option(SYSTEM_MTCP	"Use system mTcp" OFF)
+option(MTCP_FLAGS	"mTCP flags for build" OFF)
+option(MTCP_CFLAGS	"mTCP cflags for build" OFF)
+
 #added cmake folder to cmake modules search
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 # Settings
-#include(nginx)
+include(nginx)
 
+set(THIRD_PARTY_PATH "${CMAKE_SOURCE_DIR}/third_party")
+set(NGINX_VERSION "1.13.8")
+set(NGINX_FLAGS "")
+set(NGINX_PATH "${THIRD_PARTY_PATH}/nginx-${NGINX_VERSION}")
+
+nginx_exists(${THIRD_PARTY_PATH} NGINX_SRC_FOUND)
+if(NOT ${NGINX_SRC_FOUND})
+	message(STATUS "Not found Nginx sources version of: ${NGINX_VERSION}")
+	nginx_download(${THIRD_PARTY_PATH} NGINX_DOWNLOAD_RESULT)
+
+	if(NOT NGINX_DOWNLOAD_RESULT)
+		message(FATAL_ERROR "Could not download nginx sources of version: ${NGINX_VERSION}")
+	endif()
+
+	nginx_configure(${THIRD_PARTY_PATH} NGINX_CONFIGURE_RESULT)
+	if(NOT ${NGINX_CONFIGURE_RESULT})
+		message(FATAL_ERROR "Could not configure nginx with flags: ${NGINX_FLAGS}")
+	endif()
+endif()
+
+#checking deps
 find_package(netmap REQUIRED)
 find_package(Numa REQUIRED)
+
+if(NOT ${SYSTEM_MTCP})
+	if(NOT ${MTCP_FLAGS})
+		set(MTCP_FLAGS "--enable-netmap")
+	endif()
+
+	if(NOT ${MTCP_CFLAGS})
+		set(MTCP_CFLAGS ${CMAKE_C_FLAGS})
+	endif()
+
+	include(mtcp)
+
+	mtcp_exists(${THIRD_PARTY_PATH} MTCP_SRC_FOUND)
+	if(NOT ${MTCP_SRC_FOUND})
+		message(STATUS "Not found mtcp sources")
+		mtcp_download(${THIRD_PARTY_PATH} MTCP_DOWNLOAD_RESULT)
+
+		if(NOT MTCP_DOWNLOAD_RESULT)
+			message(FATAL_ERROR "Could not download mtcp sources")
+		endif()
+
+		mtcp_configure(${THIRD_PARTY_PATH} MTCP_CONFIGURE_RESULT)
+		if(NOT ${MTCP_CONFIGURE_RESULT})
+			message(FATAL_ERROR "Could not configure mtcp with cflags: ${MTCP_CFLAGS} flags: ${MTCP_FLAGS}")
+		endif()
+
+		mtcp_build(${THIRD_PARTY_PATH} MTCP_BUILD_RESULT)
+		if(NOT ${MTCP_BUILD_RESULT})
+			message(FATAL_ERROR "Could not build mtcp")
+		endif()
+	endif()
+
+	set(CMAKE_INCLUDE_PATH "${THIRD_PARTY_PATH}/mtcp/mtcp/include")
+	set(CMAKE_LIBRARY_PATH "${THIRD_PARTY_PATH}/mtcp/mtcp/lib")
+endif()
 find_package(mTCP REQUIRED)
 
 # Add header location
@@ -26,8 +86,8 @@ include_directories(
 	${MTCP_INCLUDE_DIR}
 	${NUMA_INCLUDE_DIR}
 	${CMAKE_SOURCE_DIR}/include
-	${CMAKE_SOURCE_DIR}/third_party/nginx-1.13.8/src/os/unix
-	${CMAKE_SOURCE_DIR}/third_party/nginx-1.13.8/objs
+	${NGINX_PATH}/src/os/unix
+	${NGINX_PATH}/objs
 )
 
 file(GLOB_RECURSE app_src RELATIVE ${CMAKE_SOURCE_DIR} "src/*")

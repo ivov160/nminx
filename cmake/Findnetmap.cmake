@@ -4,16 +4,19 @@
 #  NETMAP_INCLUDE_DIR, where to find kernel module headers.
 #  NETMAP_FOUND, If false, do not try to use netmap API.
 
-FIND_PATH(NETMAP_INCLUDE_DIR 
-	NAMES 
+set(NETMAP_FOUND FALSE)
+set(NETMAP_LIBRARY)
+set(NETMAP_INCLUDE_DIR)
+
+FIND_FILE(NETMAP_INCLUDE_DIR 
+	NAMES
 		netmap.h
-		#netmap_user.h
-		#netmap_virt.h
+		netmap_user.h
+		netmap_virt.h
 	PATHS
-		/usr/local/include
 		/usr/include
-	PATH_SUFFIXES
-		net
+		/usr/local/include
+		/usr/local/include/net
 	DOC "netmap include directory path"
 )
 

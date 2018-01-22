@@ -1,10 +1,13 @@
-# - Find netmap
-# Find the netmap includes and library
+# - Find Tar
+# Find the tar binnary
 # This module defines
-#  TAR_BIN, where to find kernel module headers.
-#  TAR_FOUND, If false, do not try to use netmap API.
+#  TAR_BIN, tar elf file.
+#  TAR_FOUND, If false, do not try to use TAR_BIN.
 
-FIND_program(TAR_BIN 
+set(TAR_FOUND FALSE)
+set(TAR_BIN)
+
+FIND_PROGRAM(TAR_BIN 
 	NAMES 
 		tar
 	PATHS
