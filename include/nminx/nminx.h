@@ -17,13 +17,20 @@
 
 #define MAX_CONNECTIONS 10000
 
+#define UNDERSCORES_IN_HEADERS (1 << 1)
+#define IGNORE_INVALID_HEADERS (1 << 2)
+#define URI_MERGE_SLASHES (1 << 3)
+
 typedef struct
 {
-	//uint32_t connection_memmory_size;
 	uint32_t connection_pool_size;
 	uint32_t connection_buffer_size;
 
 	uint32_t request_pool_size;
+	uint32_t request_large_buffer_size;
+	uint32_t request_large_buffer_count;
+	
+	uint32_t request_headers_processing_flags;
 
 	uint32_t wdt_timeout_ms;
 	uint32_t worker_pool_size;

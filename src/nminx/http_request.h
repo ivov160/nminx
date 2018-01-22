@@ -10,6 +10,15 @@
 #include <nginx/ngx_buf.h>
 #include <nginx/ngx_http_request.h>
 
+typedef struct http_large_buffer_s http_large_buffer_t;
+struct http_large_buffer_s
+{
+    ngx_chain_t                      *busy;
+    ngx_int_t                         nbusy;
+
+    ngx_chain_t                      *free;
+};
+
 struct http_connection_ctx_s
 {
 	// structured fields
@@ -21,6 +30,7 @@ struct http_connection_ctx_s
 
 	// application layer
 	ngx_http_request_t* request;
+	http_large_buffer_t* lb;
 
 	// flow control flags
 	int need_close;

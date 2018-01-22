@@ -308,26 +308,6 @@ typedef struct {
 
 typedef struct ngx_http_addr_conf_s  ngx_http_addr_conf_t;
 
-//typedef struct {
-    //ngx_http_addr_conf_t             *addr_conf;
-    //ngx_http_conf_ctx_t              *conf_ctx;
-
-//#if (NGX_HTTP_SSL || NGX_COMPAT)
-    //ngx_str_t                        *ssl_servername;
-//#if (NGX_PCRE)
-    //ngx_http_regex_t                 *ssl_servername_regex;
-//#endif
-//#endif
-
-    //ngx_chain_t                      *busy;
-    //ngx_int_t                         nbusy;
-
-    //ngx_chain_t                      *free;
-
-    //unsigned                          ssl:1;
-    //unsigned                          proxy_protocol:1;
-//} ngx_http_connection_t;
-
 
 typedef void (*ngx_http_cleanup_pt)(void *data);
 
@@ -373,7 +353,7 @@ typedef void (*ngx_http_event_handler_pt)(ngx_http_request_t *r);
 struct ngx_http_request_s {
     uint32_t                          signature;         /* "HTTP" */
 
-	ngx_connection_t                 *connection;
+	http_connection_ctx_t			 *connection;
 
     //void                            **ctx;
     //void                            **main_conf;

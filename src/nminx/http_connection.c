@@ -31,6 +31,14 @@ http_connection_ctx_t* http_connection_create(nminx_config_t* m_cfg)
 		return NULL;
 	}
 
+	hc->lb = ngx_pcalloc(pool, sizeof(http_large_buffer_t));
+	if(!hc->lb)
+	{
+		printf("Failed allocate http_large_buffer_t!\n");
+		ngx_destroy_pool(pool);
+		return NULL;
+	}
+
 	hc->m_cfg = m_cfg;
 	hc->pool = pool;
 	hc->need_close = FALSE;

@@ -21,6 +21,10 @@ static uint32_t default_connection_pool_size = NGX_DEFAULT_POOL_SIZE;
 static uint32_t default_connection_buffer_size = 1024;
 
 static uint32_t default_request_pool_size = NGX_DEFAULT_POOL_SIZE;
+static uint32_t default_request_large_buffer_size = 8192;
+static uint32_t default_request_large_buffer_count = 4;
+static uint32_t default_request_headers_processing_flags = UNDERSCORES_IN_HEADERS | IGNORE_INVALID_HEADERS | URI_MERGE_SLASHES;
+
 
 static void worker_signal_handler(int sig)
 {
@@ -199,6 +203,9 @@ int main(int argc, char* argv[])
 	m_cfg.connection_buffer_size = default_connection_buffer_size;
 
 	m_cfg.request_pool_size = default_request_pool_size;
+	m_cfg.request_large_buffer_size = default_request_large_buffer_size;
+	m_cfg.request_large_buffer_count = default_request_large_buffer_count;
+	m_cfg.request_headers_processing_flags = default_request_headers_processing_flags;
 
 	m_cfg.mtcp_cpu = default_mtcp_cpu;
 	m_cfg.mtcp_max_events = default_mtcp_max_events;
