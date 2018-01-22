@@ -11,13 +11,15 @@
 
 #include "http_request.h"
 
-http_connection_ctx_t* http_connection_create(nminx_config_t* m_cfg)
+http_connection_ctx_t* http_connection_create(config_t* conf)
 {
-	ngx_pool_t* pool = ngx_create_pool(m_cfg->connection_pool_size);
+	connection_config_t* conn_conf = get_conn_conf(conf);
+
+	ngx_pool_t* pool = ngx_create_pool(conn_conf->pool_size);
 	if(!pool)
 	{
 		printf("Failed allocate connection memmory pool, size: %d\n", 
-				m_cfg->connection_pool_size);
+				conn_conf->pool_size);
 		return NULL;
 	}
 
@@ -39,7 +41,7 @@ http_connection_ctx_t* http_connection_create(nminx_config_t* m_cfg)
 		return NULL;
 	}
 
-	hc->m_cfg = m_cfg;
+	hc->conf = conf;
 	hc->pool = pool;
 	hc->need_close = FALSE;
 
@@ -64,9 +66,10 @@ int http_connection_destroy(http_connection_ctx_t* conn)
 int http_connection_read_handler(socket_ctx_t* socket)
 {
 	http_connection_ctx_t* hc = (http_connection_ctx_t*) socket->data;
-	nminx_config_t* m_cfg = hc->m_cfg;
+	config_t* conf = hc->conf;
+	http_request_config_t* http_req_conf = get_http_req_conf(conf);
 
-	uint32_t buf_size = m_cfg->connection_buffer_size;
+	uint32_t buf_size = http_req_conf->pool_size;
 	ngx_buf_t* buf = hc->buf;
 
 	if(buf == NULL)
@@ -157,7 +160,7 @@ int http_connection_cleanup_handler(void* data)
 int http_connection_accept(socket_ctx_t* l_socket)
 {
 	server_ctx_t* s_ctx = (server_ctx_t*) l_socket->data;
-	nminx_config_t* m_cfg = s_ctx->m_cfg;
+	config_t* conf = s_ctx->conf;
 
 	socket_ctx_t* c_socket = socket_accept(l_socket);
 	if(!c_socket)
@@ -166,7 +169,7 @@ int http_connection_accept(socket_ctx_t* l_socket)
 		return NMINX_ERROR;
 	}
 
-	http_connection_ctx_t* hc = http_connection_create(m_cfg);
+	http_connection_ctx_t* hc = http_connection_create(conf);
 	if(!hc)
 	{
 		printf("Failed create http_connection!\n");

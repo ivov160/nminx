@@ -8,14 +8,12 @@
 
 typedef struct
 {
-	nminx_config_t* m_cfg;
-
+	config_t* conf;
 	io_ctx_t* io_ctx;
-
 	socket_ctx_t* sockets[MAX_CONNECTIONS];
 } server_ctx_t;
 
-server_ctx_t* server_init(nminx_config_t* cfg);
+server_ctx_t* server_init(config_t* conf);
 int server_destroy(server_ctx_t* srv);
 
 int server_process_events(server_ctx_t* s_cfg);

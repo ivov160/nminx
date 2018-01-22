@@ -22,7 +22,7 @@ struct http_large_buffer_s
 struct http_connection_ctx_s
 {
 	// structured fields
-	nminx_config_t* m_cfg;
+	config_t* conf;
 	socket_ctx_t* socket;
 
 	ngx_pool_t* pool;

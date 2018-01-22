@@ -6,7 +6,7 @@
 
 typedef struct http_connection_ctx_s http_connection_ctx_t;
 
-http_connection_ctx_t* http_connection_create(nminx_config_t* m_cfg);
+http_connection_ctx_t* http_connection_create(config_t* conf);
 int http_connection_destroy(http_connection_ctx_t* conn);
 
 // socket API handlers

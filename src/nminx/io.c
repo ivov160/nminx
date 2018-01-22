@@ -15,14 +15,16 @@
 
 static io_ctx_t mtcp_io_ctx = { 0 };
 
-io_ctx_t* io_init(nminx_config_t* m_cfg)
+io_ctx_t* io_init(config_t* conf)
 {
 	if(mtcp_io_ctx.mctx)
 	{
 		return &mtcp_io_ctx;
 	}
 
-	int result = mtcp_init(m_cfg->mtcp_config_path);
+	mtcp_config_t* io_conf = get_io_conf(conf);
+
+	int result = mtcp_init(io_conf->config_path);
 	if(result < 0) 
 	{
 		printf("Failed to initialize mtcp\n");
@@ -38,7 +40,7 @@ io_ctx_t* io_init(nminx_config_t* m_cfg)
 	//mtcp_core_affinitize(m_cfg->mtcp_cpu);
 	
 	// create mtcp context: this will spawn an mtcp thread 
-	mtcp_io_ctx.mctx = mtcp_create_context(m_cfg->mtcp_cpu);
+	mtcp_io_ctx.mctx = mtcp_create_context(io_conf->cpu);
 	if (!mtcp_io_ctx.mctx) 
 	{
 		printf("Failed to create mtcp context!\n");
@@ -47,7 +49,7 @@ io_ctx_t* io_init(nminx_config_t* m_cfg)
 	}
 
 	// create epoll descriptor 
-	mtcp_io_ctx.ep = mtcp_epoll_create(mtcp_io_ctx.mctx, m_cfg->mtcp_max_events);
+	mtcp_io_ctx.ep = mtcp_epoll_create(mtcp_io_ctx.mctx, io_conf->max_events);
 	if (mtcp_io_ctx.ep < 0) 
 	{
 		printf("Failed to create epoll descriptor!\n");

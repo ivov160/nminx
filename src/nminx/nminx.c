@@ -3,28 +3,39 @@
 #include <nminx/process.h>
 #include <nminx/watchdog.h>
 
+/** def configs */
+static mtcp_config_t mtcp_conf = {
+	0, /* cpu */
+	MAX_CONNECTIONS, /* max_events */
+};
+
+static connection_config_t conn_conf = {
+	NGX_DEFAULT_POOL_SIZE, /* pool_size */
+	1024, /* buffer_size */
+};
+
+static http_request_config_t http_req_conf = {
+	NGX_DEFAULT_POOL_SIZE, /* pool_size */
+	8192, /* large_buffer_chunk_size */
+	4, /* large_biffer_chunk_count */
+	UNDERSCORES_IN_HEADERS | IGNORE_INVALID_HEADERS | URI_MERGE_SLASHES, /* headers_flags */
+	NULL, /* headers_in_hash */
+};
+
+static watchdog_config_t wdt_conf = {
+	1000, /* poll_timeout in ms*/
+	3, /* workers */
+};
+
+static server_config_t serv_conf = {
+	//inet_addr("0.0.0.0"), [> ip <]
+	//htons(8080), [> port <]
+	INADDR_ANY, /* ip */
+	0, /* port */
+	4096, /* backlog */
+};
+
 static int is_active = TRUE;
-
-static int default_mtcp_cpu = 0;
-static uint32_t defailt_wdt_timeout = 1000;
-static uint32_t default_backlog_size = 4096;
-static uint32_t default_worker_pool_size = 3;
-static char* default_mtcp_config_path = "config/nminx.conf";
-
-//static int default_mtcp_max_events = 30000; //MAX_FLOW_NUM * 3 see mtcp example server
-static int default_mtcp_max_events = MAX_CONNECTIONS; //MAX_FLOW_NUM * 3 see mtcp example server
-
-static char* default_ip = "0.0.0.0";
-static int default_port = 8080;
-
-static uint32_t default_connection_pool_size = NGX_DEFAULT_POOL_SIZE;
-static uint32_t default_connection_buffer_size = 1024;
-
-static uint32_t default_request_pool_size = NGX_DEFAULT_POOL_SIZE;
-static uint32_t default_request_large_buffer_size = 8192;
-static uint32_t default_request_large_buffer_count = 4;
-static uint32_t default_request_headers_processing_flags = UNDERSCORES_IN_HEADERS | IGNORE_INVALID_HEADERS | URI_MERGE_SLASHES;
-
 
 static void worker_signal_handler(int sig)
 {
@@ -99,20 +110,21 @@ static int main_process(void* data)
 		printf("Main config is NULL\n");
 		return NMINX_ERROR;
 	}
-	nminx_config_t* m_cfg = (nminx_config_t*) data;
+	config_t* conf = (config_t*) data;
+	watchdog_config_t* wdt_conf = get_wdt_conf(conf);
 
 	signal(SIGTERM, watchdog_signal_handler);
 	signal(SIGINT, watchdog_signal_handler);
 
-	server_ctx_t* s_ctx = server_init(m_cfg);
+	server_ctx_t* s_ctx = server_init(conf);
 	if(!s_ctx)
 	{
 		printf("Failed create server!\n");
 		return NMINX_ERROR;
 	}
 
-	watchdog_process_config_t* workers_pool = 
-		(watchdog_process_config_t*) calloc(m_cfg->worker_pool_size, sizeof(watchdog_process_config_t));
+	watchdog_process_config_t* workers_pool = (watchdog_process_config_t*) 
+		calloc(wdt_conf->workers, sizeof(watchdog_process_config_t));
 
 	if(!workers_pool)
 	{
@@ -125,14 +137,14 @@ static int main_process(void* data)
 	w_ctx.process = run_worker_process;
 	w_ctx.data = (void*) s_ctx;
 
-	for(uint32_t i = 0; i < m_cfg->worker_pool_size; ++i)
+	for(uint32_t i = 0; i < wdt_conf->workers; ++i)
 	{
 		watchdog_process_config_t* w = &workers_pool[i];
 		w->process = &w_ctx;
 		w->handler = watchdog_state_handler;
 	}
 
-	if(watchdog_start(workers_pool, m_cfg->worker_pool_size) != NMINX_OK)
+	if(watchdog_start(workers_pool, wdt_conf->workers) != NMINX_OK)
 	{
 		printf("Failed initialize watchdog!\n");
 		free(workers_pool);
@@ -142,7 +154,7 @@ static int main_process(void* data)
 
 	while(is_active)
 	{
-		watchdog_exec(m_cfg->wdt_timeout_ms);
+		watchdog_exec(wdt_conf->poll_timeout);
 	}
 	///@todo wait childrens before destroy all configs
 	watchdog_stop();
@@ -162,12 +174,12 @@ static int debug_process(void* data)
 		printf("Main config is NULL\n");
 		return NMINX_ERROR;
 	}
-	nminx_config_t* m_cfg = (nminx_config_t*) data;
+	config_t* conf = (config_t*) data;
 
 	signal(SIGTERM, worker_signal_handler);
 	signal(SIGINT, worker_signal_handler);
 
-	server_ctx_t* s_ctx = server_init(m_cfg);
+	server_ctx_t* s_ctx = server_init(conf);
 	if(!s_ctx)
 	{
 		printf("Failed create server!\n");
@@ -193,26 +205,14 @@ static int debug_process(void* data)
 int main(int argc, char* argv[]) 
 {
 	// initialize application config
-	nminx_config_t m_cfg = { 0 };
+	config_t m_cfg = { 0 };
+	config_t* pconf = &m_cfg;
 
-	m_cfg.ip = inet_addr(default_ip);
-	m_cfg.port = htons(default_port);
-	m_cfg.backlog = default_backlog_size;
-
-	m_cfg.connection_pool_size = default_connection_pool_size;
-	m_cfg.connection_buffer_size = default_connection_buffer_size;
-
-	m_cfg.request_pool_size = default_request_pool_size;
-	m_cfg.request_large_buffer_size = default_request_large_buffer_size;
-	m_cfg.request_large_buffer_count = default_request_large_buffer_count;
-	m_cfg.request_headers_processing_flags = default_request_headers_processing_flags;
-
-	m_cfg.mtcp_cpu = default_mtcp_cpu;
-	m_cfg.mtcp_max_events = default_mtcp_max_events;
-	m_cfg.mtcp_config_path = default_mtcp_config_path;
-
-	m_cfg.wdt_timeout_ms = defailt_wdt_timeout;
-	m_cfg.worker_pool_size = default_worker_pool_size;
+	set_io_conf(pconf, &mtcp_conf);
+	set_wdt_conf(pconf, &wdt_conf);
+	set_serv_conf(pconf, &serv_conf);
+	set_conn_conf(pconf, &conn_conf);
+	set_http_req_conf(pconf, &http_req_conf);
 
 	// initialize wdt_process
 	//process_config_t mp_cfg = { 0 };
@@ -231,5 +231,5 @@ int main(int argc, char* argv[])
 	
 	//return 0;
 
-	return debug_process((void*) &m_cfg);
+	return debug_process((void*) pconf);
 }

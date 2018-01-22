@@ -27,7 +27,7 @@ enum io_event_flag
 	IO_EVENT_ET = (1 << 31)
 };
 
-io_ctx_t* io_init(nminx_config_t* cfg);
+io_ctx_t* io_init(config_t* conf);
 int io_destroy(io_ctx_t* io);
 
 int io_poll_ctl(io_ctx_t* io, int op, int flags, socket_ctx_t* sock);
