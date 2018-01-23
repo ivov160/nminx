@@ -3,9 +3,6 @@
 
 #include <nminx/nminx.h>
 
-typedef struct io_ctx_s io_ctx_t;
-
-typedef struct socket_ctx_s socket_ctx_t;
 typedef int (*event_handler_t)(struct socket_ctx_s*);
 typedef int (*cleanup_handler_t)(void*);
 
@@ -19,6 +16,16 @@ struct socket_ctx_s
 	void* data;
 	cleanup_handler_t cleanup_handler;
 
+	/**
+	 * @todo	Implement event handlers as chain.
+	 * 
+	 *			When logic grow in depth every new layer 
+	 *			must copy prev handler or reimplement him.
+	 *			This is first step to copy&paste, it is bad idea
+	 *			If event handling wil be a chain every new layer of logic 
+	 *			just add self handler to a chain head. 
+	 *			And do not touch prev event handlers.
+	 */
 	event_handler_t read_handler;
 	event_handler_t write_handler;
 	event_handler_t close_handler;

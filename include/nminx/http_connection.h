@@ -2,12 +2,14 @@
 #define __NMINX_HTTP_CONNECTION_H
 
 #include <nminx/nminx.h>
-#include <nminx/socket.h>
+#include <nminx/config.h>
 
-typedef struct http_connection_ctx_s http_connection_ctx_t;
 
 http_connection_ctx_t* http_connection_create(config_t* conf);
 int http_connection_destroy(http_connection_ctx_t* conn);
+
+//listener initialize function
+int http_listner_init_handler(config_t* conf, socket_ctx_t* socket);
 
 // socket API handlers
 int http_connection_read_handler(socket_ctx_t* socket);

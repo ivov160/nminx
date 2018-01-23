@@ -363,30 +363,30 @@ ngx_pool_cleanup_add(ngx_pool_t *p, size_t size)
 /*}*/
 
 
-#if 0
+//#if 0
 
-static void *
-ngx_get_cached_block(size_t size)
-{
-    void                     *p;
-    ngx_cached_block_slot_t  *slot;
+//static void *
+//ngx_get_cached_block(size_t size)
+//{
+    //void                     *p;
+    //ngx_cached_block_slot_t  *slot;
 
-    if (ngx_cycle->cache == NULL) {
-        return NULL;
-    }
+    //if (ngx_cycle->cache == NULL) {
+        //return NULL;
+    //}
 
-    slot = &ngx_cycle->cache[(size + ngx_pagesize - 1) / ngx_pagesize];
+    //slot = &ngx_cycle->cache[(size + ngx_pagesize - 1) / ngx_pagesize];
 
-    slot->tries++;
+    //slot->tries++;
 
-    if (slot->number) {
-        p = slot->block;
-        slot->block = slot->block->next;
-        slot->number--;
-        return p;
-    }
+    //if (slot->number) {
+        //p = slot->block;
+        //slot->block = slot->block->next;
+        //slot->number--;
+        //return p;
+    //}
 
-    return NULL;
-}
+    //return NULL;
+//}
 
-#endif
+//#endif

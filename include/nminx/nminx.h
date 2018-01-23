@@ -4,9 +4,12 @@
 #include <nginx/ngx_config.h>
 #include <nginx/ngx_core.h>
 
-#include <nminx/config.h>
+typedef struct io_ctx_s io_ctx_t;
+typedef struct socket_ctx_s socket_ctx_t;
+typedef struct server_ctx_s server_ctx_t;
+typedef struct http_connection_ctx_s http_connection_ctx_t;
 
-#define  NMINX_OK         NGX_OK
+#define  NMINX_OK         NGX_OK			// 
 #define  NMINX_ERROR      NGX_ERROR
 #define  NMINX_AGAIN      NGX_AGAIN
 #define  NMINX_BUSY       NGX_BUSY

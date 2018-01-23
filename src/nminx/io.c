@@ -1,4 +1,5 @@
 #include <nminx/io.h>
+#include <nminx/socket.h>
 // not good hack, but now all mtcp data hidden in modules
 // io implementation (mtcp) can be replaced without big refactoring
 #include "io_ctx.h"

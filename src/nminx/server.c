@@ -1,5 +1,7 @@
 #include <nminx/server.h>
-#include <nminx/http_connection.h>
+
+#include <nminx/io.h>
+#include <nminx/socket.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,11 +16,11 @@
 // In plan for continue need custom memory allocation
 static server_ctx_t server_ctx = { 0 };
 
-//static int server_accept_socket_handler(socket_ctx_t* socket);
-static int server_stub_socket_handler(socket_ctx_t* socket);
-static int server_close_socket_handler(socket_ctx_t* socket);
+static int server_close_listener(socket_ctx_t* sock);
+static int server_close_socket(server_ctx_t* s_ctx, socket_ctx_t* sock);
 
-static int server_close_socket(server_ctx_t* s_ctx, socket_ctx_t* socket);
+static void server_io_event_handler(server_ctx_t* s_ctx, socket_ctx_t* sock, int rc);
+static void server_error_event_handler(server_ctx_t* s_ctx, socket_ctx_t* sock);
 
 server_ctx_t* server_init(config_t* conf)
 {
@@ -31,7 +33,7 @@ server_ctx_t* server_init(config_t* conf)
 		return s_ctx;
 	}
 
-	io_ctx_t* io_ctx = io_init(io_conf);
+	io_ctx_t* io_ctx = io_init(conf);
 	if(!io_ctx)
 	{
 		printf("Failed initialize io system!\n");
@@ -45,8 +47,11 @@ server_ctx_t* server_init(config_t* conf)
 		io_destroy(io_ctx);
 		return NULL;
 	}
+	l_sock->data = (void*) s_ctx;
+	l_sock->close_handler = server_close_listener;
 
-	if(socket_bind(l_sock, serv_conf->ip, serv_conf->port) == NMINX_ERROR)
+	in_addr_t port = serv_conf->port == 0 ? htons(DEFAULT_PORT) : serv_conf->port;
+	if(socket_bind(l_sock, serv_conf->ip, port) == NMINX_ERROR)
 	{
 		printf("Failed bind socket!\n");
 		socket_destroy(l_sock);
@@ -62,19 +67,13 @@ server_ctx_t* server_init(config_t* conf)
 		return NULL;
 	}
 
-	if(io_poll_ctl(io_ctx, IO_CTL_ADD, IO_EVENT_READ, l_sock) == NMINX_ERROR)
+	if(serv_conf->listener_init_handler(conf, l_sock) == NMINX_ERROR)
 	{
-		printf("Failed attach read event to socket!\n");
+		printf("Failed initilize listner socket handlers!\n");
 		socket_destroy(l_sock);
 		io_destroy(io_ctx);
 		return NULL;
 	}
-	
-	l_sock->data = (void*) s_ctx;
-	l_sock->read_handler = http_connection_accept;
-	l_sock->write_handler = server_stub_socket_handler;
-	l_sock->close_handler = server_stub_socket_handler;
-	//l_sock->close = server_close_socket_handler;
 
 	s_ctx->conf = conf;
 	s_ctx->io_ctx = io_ctx;
@@ -111,7 +110,6 @@ int server_destroy(server_ctx_t* s_ctx)
 	return NMINX_OK;
 }
 
-///@todo need add errors handling
 int server_process_events(server_ctx_t* s_ctx)
 {
 	io_ctx_t* io = s_ctx->io_ctx;
@@ -129,53 +127,22 @@ int server_process_events(server_ctx_t* s_ctx)
 		socket_ctx_t* sock = sb[i];
 		if(sock->flags & IO_EVENT_ERROR)
 		{
-			printf("IO_EVENT_ERROR\n");
-			
-			int err = 0;
-			socklen_t len = sizeof(err);
-
-			int result = socket_get_option(sock, SOL_SOCKET, SO_ERROR, (void*) &err, &len);
-			if(result == NMINX_OK)
-			{
-				if(err != ETIMEDOUT)
-				{
-					printf("Error on socket %d, error: %s\n", 
-							sock->fd, strerror(err));
-				}
-				else
-				{
-					printf("Timeout on socket %d\n", sock->fd);
-				}
-			}
-			else
-			{
-				printf("socket_get_option error\n");
-			}
-			server_close_socket(s_ctx, sock);
+			//printf("IO_EVENT_ERROR\n");
+			server_error_event_handler(s_ctx, sock);
 		}
 		else if(sock->flags & IO_EVENT_READ)
 		{
-			printf("IO_EVENT_READ\n");
-			int result = socket_read_action(sock);
-			printf("socket_read_action: %d\n", result);
-
-			if(result < NMINX_OK)
-			{
-				if(result != NMINX_AGAIN)
-				{
-					printf("Failed read date from socket %d, err: %s\n", 
-							sock->fd, strerror(errno));
-
-					server_close_socket(s_ctx, sock);
-				}
-			}
+			//printf("IO_EVENT_READ\n");
+			//printf("socket_read_action: %d\n", result);
+			int rc = socket_read_action(sock);
+			server_io_event_handler(s_ctx, sock, rc);
 		}
 		else if(sock->flags & IO_EVENT_WRITE)
 		{
-			printf("IO_EVENT_WRITE\n");
-			int result = socket_write_action(sock);
-			printf("socket_write_action: %d\n", result);
-			// result handling
+			//printf("IO_EVENT_WRITE\n");
+			//printf("socket_write_action: %d\n", result);
+			int rc = socket_write_action(sock);
+			server_io_event_handler(s_ctx, sock, rc);
 		}
 		else
 		{	// unexpected flag state
@@ -186,76 +153,72 @@ int server_process_events(server_ctx_t* s_ctx)
 	return NMINX_OK;
 }
 
-int server_add_socket(server_ctx_t* s_ctx, socket_ctx_t* socket)
+int server_add_socket(server_ctx_t* s_ctx, socket_ctx_t* sock)
 {
-	///@todo collision checking
-	s_ctx->sockets[socket->fd] = socket;
-
-	return NMINX_OK;
-}
-
-int server_close_socket(server_ctx_t* s_ctx, socket_ctx_t* socket)
-{
-	socket_close_action(socket);
-	s_ctx->sockets[socket->fd] = NULL;
-	return NMINX_OK;
-}
-
-int server_stub_socket_handler(socket_ctx_t* socket)
-{
-	return NMINX_OK;
-}
-
-/*
-int server_accept_socket_handler(socket_ctx_t* socket)
-{
-	server_ctx_t* s_ctx = (server_ctx_t*) socket->data;
-	main_config_t* m_cfg = s_ctx->m_cfg;
-
-	socket_ctx_t* c_socket = socket_accept(socket);
-	if(!c_socket)
+	socket_ctx_t* cs = s_ctx->sockets[sock->fd];
+	if(cs != NULL)
 	{
-		printf("Failed accept client!\n");
+		printf("Duplicate socket fd: %d\n", sock->fd);
 		return NMINX_ERROR;
 	}
 
-
-	http_connection_ctx_t* hc = http_connection_create(m_cfg);
-	if(!hc)
-	{
-		printf("Failed create http_connection!\n");
-		socket_close(c_socket);
-		return NMINX_ERROR;
-	}
-
-	c_socket->data = hc;
-	c_socket->cleanup_handler = http_connection_cleanup_handler;
-
-	c_socket->read_handler = http_connection_read_handler;
-	c_socket->write_handler = http_connection_write_handler;
-	c_socket->close_handler = http_connection_close_handler;
-
-	if(io_poll_ctl(c_socket->io, IO_CTL_ADD, IO_EVENT_READ, c_socket) == NMINX_ERROR)
-	{
-		printf("Failed attach read event to socket!\n");
-		free(conn);
-		socket_close_action(c_socket);
-		socket_destroy(c_socket);
-		return NMINX_ERROR;
-	}
-
-	server_ctx_t* s_ctx = (server_ctx_t*) socket->data;
-	s_ctx->sockets[c_socket->fd] = c_socket;
-
+	s_ctx->sockets[sock->fd] = sock;
 	return NMINX_OK;
 }
 
-int server_close_socket_handler(socket_ctx_t* socket)
+static int server_close_listener(socket_ctx_t* sock)
 {
-	server_ctx_t* s_ctx = (server_ctx_t*) socket->data;
-	server_destroy(s_ctx);
+	server_ctx_t* s_ctx = (server_ctx_t*) sock->data;
+	s_ctx->is_run = FALSE;
+
+	sock->close_handler = socket_destroy;
+	return server_close_socket(s_ctx, sock);
+}
+
+int server_close_socket(server_ctx_t* s_ctx, socket_ctx_t* sock)
+{
+	socket_close_action(sock);
+
+	s_ctx->sockets[sock->fd] = NULL;
 	return NMINX_OK;
 }
-*/
+
+static void server_io_event_handler(server_ctx_t* s_ctx, socket_ctx_t* sock, int rc)
+{
+	if(rc == NMINX_ERROR)
+	{
+		printf("Event failed socket %d, err: %s\n", 
+				sock->fd, strerror(errno));
+	}
+	
+	if(rc != NMINX_AGAIN)
+	{
+		server_close_socket(s_ctx, sock);
+	}
+}
+
+static void server_error_event_handler(server_ctx_t* s_ctx, socket_ctx_t* sock)
+{
+	int err = 0;
+	socklen_t len = sizeof(err);
+
+	if(socket_get_option(sock, SOL_SOCKET, SO_ERROR, (void*) &err, &len) == NMINX_OK)
+	{
+		if(err != ETIMEDOUT)
+		{
+			printf("Error on socket %d, error: %s\n", 
+					sock->fd, strerror(err));
+		}
+		else
+		{
+			printf("Timeout on socket %d\n", sock->fd);
+		}
+	}
+	else
+	{
+		printf("socket_get_option error\n");
+	}
+	server_close_socket(s_ctx, sock);
+}
 
 

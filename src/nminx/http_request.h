@@ -2,7 +2,7 @@
 #define __NMINX_HTTP_REQUEST_H
 
 #include <nminx/nminx.h>
-#include <nminx/http_connection.h>
+#include <nminx/config.h>
 
 #include <nginx/ngx_config.h>
 #include <nginx/ngx_core.h>
@@ -38,7 +38,12 @@ struct http_connection_ctx_s
 };
 
 ngx_http_request_t* http_request_create(http_connection_ctx_t* ctx);
+void http_request_destroy(ngx_http_request_t* r);
+
 int http_request_init_events(http_connection_ctx_t* ctx);
+
+// initialize config
+int http_request_init_config(config_t* conf);
 
 //int http_request_read_handler(socket_ctx_t* socket);
 //int http_request_write_handler(socket_ctx_t* socket);

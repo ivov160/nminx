@@ -7,8 +7,6 @@
 #include <nginx/ngx_core.h>
 #include <nginx/ngx_http.h>
 
-#include <nminx/http_connection.h>
-
 #ifndef _NGX_HTTP_REQUEST_H_INCLUDED_
 #define _NGX_HTTP_REQUEST_H_INCLUDED_
 
@@ -353,21 +351,13 @@ typedef void (*ngx_http_event_handler_pt)(ngx_http_request_t *r);
 struct ngx_http_request_s {
     uint32_t                          signature;         /* "HTTP" */
 
-	http_connection_ctx_t			 *connection;
+	/** 
+	 * @note	hide connection struct 
+	 *			for connection is use not ngx_http_connection
+	 */
+	void							 *connection;
 
-    //void                            **ctx;
-    //void                            **main_conf;
-    //void                            **srv_conf;
-    //void                            **loc_conf;
-
-    //ngx_http_event_handler_pt         read_event_handler;
-    //ngx_http_event_handler_pt         write_event_handler;
-
-//#if (NGX_HTTP_CACHE)
-    //ngx_http_cache_t                 *cache;
-//#endif
-
-	int								   upstream;
+	//int								   upstream;
 	//ngx_http_upstream_t              *upstream;
     //ngx_array_t                      *upstream_states;
                                          //[> of ngx_http_upstream_state_t <]
@@ -381,8 +371,8 @@ struct ngx_http_request_s {
 	ngx_http_request_body_t          *request_body;
 
     time_t                            lingering_time;
-    time_t                            start_sec;
-    ngx_msec_t                        start_msec;
+    //time_t                            start_sec;
+    //ngx_msec_t                        start_msec;
 
     ngx_uint_t                        method;
     ngx_uint_t                        http_version;
@@ -397,23 +387,10 @@ struct ngx_http_request_s {
     ngx_str_t                         http_protocol;
 
     ngx_chain_t                      *out;
-    //ngx_http_request_t               *main;
-    //ngx_http_request_t               *parent;
-    //ngx_http_postponed_request_t     *postponed;
-    //ngx_http_post_subrequest_t       *post_subrequest;
-    //ngx_http_posted_request_t        *posted_requests;
 
     ngx_int_t                         phase_handler;
 	ngx_http_handler_pt               content_handler;
     ngx_uint_t                        access_code;
-
-    //ngx_http_variable_value_t        *variables;
-
-//#if (NGX_PCRE)
-    //ngx_uint_t                        ncaptures;
-    //int                              *captures;
-    //u_char                           *captures_data;
-//#endif
 
     size_t                            limit_rate;
     size_t                            limit_rate_after;
@@ -424,11 +401,6 @@ struct ngx_http_request_s {
     off_t                             request_length;
 
     ngx_uint_t                        err_status;
-
-    //ngx_http_connection_t            *http_connection;
-    //ngx_http_v2_stream_t             *stream;
-
-    //ngx_http_log_handler_pt           log_handler;
 
     ngx_http_cleanup_t               *cleanup;
 

@@ -1,7 +1,11 @@
 #include <nminx/nminx.h>
+#include <nminx/config.h>
+
 #include <nminx/server.h>
-#include <nminx/process.h>
 #include <nminx/watchdog.h>
+#include <nminx/http_connection.h>
+
+#include <nginx/ngx_palloc.h>
 
 /** def configs */
 static mtcp_config_t mtcp_conf = {
@@ -33,19 +37,28 @@ static server_config_t serv_conf = {
 	INADDR_ANY, /* ip */
 	0, /* port */
 	4096, /* backlog */
+	http_listner_init_handler, /* listener_init_handler */
 };
 
-static int is_active = TRUE;
+static server_ctx_t* sptr = NULL;
 
 static void worker_signal_handler(int sig)
 {
-	is_active = FALSE;
+	if(sptr != NULL)
+	{
+		sptr->is_run = FALSE;
+	}
+
 }
 
 static void watchdog_signal_handler(int sig)
 {
 	//printf("watchdog_signal_handler called, sig: %d\n", sig);
-	is_active = FALSE;
+	if(sptr != NULL)
+	{
+		sptr->is_run = FALSE;
+	}
+
 	if(watchdog_signal_all(sig) != NMINX_OK)
 	{
 		printf("Failed pass signal: %i to childrens\n", sig);
@@ -54,9 +67,9 @@ static void watchdog_signal_handler(int sig)
 
 static int watchdog_state_handler(process_state_t* state, void* data)
 {
-	if(is_active)
+	if(sptr != NULL)
 	{
-		return NMINX_AGAIN;
+		return sptr->is_run ? NMINX_AGAIN : NMINX_ABORT;
 	}
 	return NMINX_ABORT;
 }
@@ -71,7 +84,10 @@ static int worker_process(void* data)
 	}
 	server_ctx_t* s_ctx = (server_ctx_t*) data;
 
-	while(is_active)
+	sptr = s_ctx;
+	s_ctx->is_run = TRUE;
+
+	while(s_ctx->is_run)
 	{
 		int result = server_process_events(s_ctx);
 		if(result != NMINX_OK)
@@ -152,7 +168,10 @@ static int main_process(void* data)
 		return NMINX_ERROR;
 	}
 
-	while(is_active)
+	sptr = s_ctx;
+	s_ctx->is_run = TRUE;
+
+	while(s_ctx->is_run)
 	{
 		watchdog_exec(wdt_conf->poll_timeout);
 	}
@@ -186,7 +205,10 @@ static int debug_process(void* data)
 		return NMINX_ERROR;
 	}
 
-	while(is_active)
+	sptr = s_ctx;
+	s_ctx->is_run = TRUE;
+
+	while(s_ctx->is_run)
 	{
 		int result = server_process_events(s_ctx);
 		if(result != NMINX_OK)
@@ -194,9 +216,13 @@ static int debug_process(void* data)
 			printf("Worker process events stoped!\n");
 			break;
 		}
+		// reset tmp_pool after interation
+		ngx_reset_pool(conf->temp_pool);
 	}
 
 	server_destroy(s_ctx);
+	ngx_destroy_pool(conf->temp_pool);
+	ngx_destroy_pool(conf->pool);
 
 	return NMINX_OK;
 }
@@ -207,6 +233,22 @@ int main(int argc, char* argv[])
 	// initialize application config
 	config_t m_cfg = { 0 };
 	config_t* pconf = &m_cfg;
+
+	ngx_pool_t* pool = ngx_create_pool(NGX_DEFAULT_POOL_SIZE);
+	if(pool == NULL)
+	{
+		printf("Failed allocate memmory pool for config!\n");
+		return 0;
+	}
+	pconf->pool = pool;
+
+	ngx_pool_t* temp_pool = ngx_create_pool(NGX_DEFAULT_POOL_SIZE);
+	if(pool == NULL)
+	{
+		printf("Failed allocate memmory pool for config!\n");
+		return 0;
+	}
+	pconf->temp_pool = temp_pool;
 
 	set_io_conf(pconf, &mtcp_conf);
 	set_wdt_conf(pconf, &wdt_conf);

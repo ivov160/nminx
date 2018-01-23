@@ -26,17 +26,21 @@ typedef struct http_request_config_s http_request_config_t;
 #define get_conn_conf(mc) (connection_config_t*) mc->slots[CONFIG_SLOT_4]
 #define get_http_req_conf(mc) (http_request_config_t*) mc->slots[CONFIG_SLOT_5]
 
-#define set_io_conf(mc, conf) mc->slots[CONFIG_SLOT_1] = conf
-#define set_wdt_conf(mc, conf) mc->slots[CONFIG_SLOT_2] = conf
-#define set_serv_conf(mc, conf) mc->slots[CONFIG_SLOT_3] = conf
-#define set_conn_conf(mc, conf) mc->slots[CONFIG_SLOT_4] = conf
-#define set_http_req_conf(mc, conf) mc->slots[CONFIG_SLOT_5] = conf
+#define set_io_conf(mc, conf) mc->slots[CONFIG_SLOT_1] = (uintptr_t) conf
+#define set_wdt_conf(mc, conf) mc->slots[CONFIG_SLOT_2] = (uintptr_t) conf
+#define set_serv_conf(mc, conf) mc->slots[CONFIG_SLOT_3] = (uintptr_t) conf
+#define set_conn_conf(mc, conf) mc->slots[CONFIG_SLOT_4] = (uintptr_t) conf
+#define set_http_req_conf(mc, conf) mc->slots[CONFIG_SLOT_5] = (uintptr_t) conf
 
 struct config_s
 {
 	uintptr_t slots[CONFIG_SLOTS_COUNT];
 
+	// pool for application
 	ngx_pool_t* pool;
+
+	// temporary pool for iteration
+	// after iteration pool reseted pointers is not valid
 	ngx_pool_t* temp_pool;
 };
 
@@ -61,7 +65,7 @@ struct http_request_config_s
 	
 	uint32_t headers_flags;
 
-	ngx_hash_t* headers_in_hash;
+	ngx_hash_t headers_in_hash;
 };
 
 struct watchdog_config_s
@@ -70,11 +74,14 @@ struct watchdog_config_s
 	uint32_t workers;
 };
 
+typedef int (*listner_init_hanler_t)(config_t*, socket_ctx_t*);
 struct server_config_s
 {
 	in_addr_t ip;
 	in_port_t port;
 	uint32_t backlog;
+
+	listner_init_hanler_t listener_init_handler;
 };
 
 #endif //__H_NMINX_CONFIG_H

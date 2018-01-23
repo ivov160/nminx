@@ -2,7 +2,7 @@
 #define _NMINX_IO_H
 
 #include <nminx/nminx.h>
-#include <nminx/socket.h>
+#include <nminx/config.h>
 
 enum io_operation
 {

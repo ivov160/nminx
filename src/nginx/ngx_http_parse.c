@@ -969,14 +969,14 @@ ngx_http_parse_header_line(ngx_http_request_t *r, ngx_buf_t *b,
             }
 
             /* IIS may send the duplicate "HTTP/1.1 ..." lines */
-            if (ch == '/'
-                && r->upstream
-                && p - r->header_name_start == 4
-                && ngx_strncmp(r->header_name_start, "HTTP", 4) == 0)
-            {
-                state = sw_ignore_line;
-                break;
-            }
+            //if (ch == '/'
+                //&& r->upstream
+                //&& p - r->header_name_start == 4
+                //&& ngx_strncmp(r->header_name_start, "HTTP", 4) == 0)
+            //{
+                //state = sw_ignore_line;
+                //break;
+            //}
 
             if (ch == '\0') {
                 return NGX_HTTP_PARSE_INVALID_HEADER;

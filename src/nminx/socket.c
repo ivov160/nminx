@@ -52,7 +52,7 @@ socket_ctx_t* socket_create(io_ctx_t* io)
 
 		sock->read_handler = socket_stub_action;
 		sock->write_handler = socket_stub_action;
-		sock->close_handler = socket_close;
+		sock->close_handler = socket_destroy;
 
 		sock->data = NULL;
 		sock->cleanup_handler = NULL;
@@ -201,16 +201,7 @@ socket_read(socket_ctx_t* socket, char *buf, size_t len)
 {
 	if(socket)
 	{
-		int result = mtcp_read(socket->io->mctx, socket->fd, buf, len);
-		if(result == 0)
-		{
-			if(errno != EAGAIN)
-			{
-				return NMINX_ERROR;
-			}
-			return NMINX_AGAIN;
-		}
-		return result;
+		return mtcp_read(socket->io->mctx, socket->fd, buf, len);
 	}
 	return 0;
 }
