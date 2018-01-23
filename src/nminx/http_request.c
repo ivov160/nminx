@@ -1,4 +1,6 @@
 #include "http_request.h"
+#include <nminx/io.h>
+#include <nminx/socket.h>
 
 static int ngx_http_process_request_line(socket_ctx_t* socket);
 static int ngx_http_process_request_headers(socket_ctx_t* socket);
@@ -1029,3 +1031,154 @@ ngx_http_process_request(ngx_http_request_t *r)
 }
 
 
+
+
+ngx_int_t
+ngx_http_hw_response(ngx_http_request_t *r)
+{
+
+
+}
+
+
+int
+ngx_http_test_reading(socket_ctx_t* sock)
+{
+    int                n;
+    char               buf[1];
+
+    //ngx_err_t          err;
+    //ngx_event_t       *rev;
+    //ngx_connection_t  *c;
+
+    //c = r->connection;
+    //rev = c->read;
+
+    //ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0, "http test reading");
+
+	n = socket_recv(sock, buf, 1, MSG_PEEK);
+
+    if (n == 0) {
+        //rev->eof = 1;
+        c->error = 1;
+        err = 0;
+
+        //goto closed;
+    } else if (n == -1) {
+        err = ngx_socket_errno;
+
+        if (err != NGX_EAGAIN) {
+            //rev->eof = 1;
+            c->error = 1;
+
+            //goto closed;
+        }
+    }
+    //[> aio does not call this handler <]
+    //if ((ngx_event_flags & NGX_USE_LEVEL_EVENT) && rev->active) {
+        //if (ngx_del_event(rev, NGX_READ_EVENT, 0) != NGX_OK) {
+            //ngx_http_close_request(r, 0);
+        //}
+    //}
+    //return;
+
+//closed:
+
+    //if (err) {
+        //rev->error = 1;
+    //}
+
+    printf("client prematurely closed connection");
+    //ngx_http_finalize_request(r, NGX_HTTP_CLIENT_CLOSED_REQUEST);
+	return NGX_ERROR;
+}
+
+
+static int
+ngx_http_writer(socket_ctx_t* sock)
+{
+    ngx_int_t                  rc;
+	http_connection_ctx_t	   *hc;
+	ngx_http_request_t		   *r;
+
+	hc = (http_connection_t*) sock->data;
+	r = hc->request;
+
+    //ngx_log_debug2(NGX_LOG_DEBUG_HTTP, wev->log, 0,
+                   //"http writer handler: \"%V?%V\"", &r->uri, &r->args);
+
+    //clcf = ngx_http_get_module_loc_conf(r->main, ngx_http_core_module);
+    //if (wev->timedout) {
+        //ngx_log_error(NGX_LOG_INFO, c->log, NGX_ETIMEDOUT,
+                      //"client timed out");
+        //c->timedout = 1;
+
+        //ngx_http_finalize_request(r, NGX_HTTP_REQUEST_TIME_OUT);
+        //return;
+    //}
+
+    //if (wev->delayed || r->aio) {
+        //ngx_log_debug0(NGX_LOG_DEBUG_HTTP, wev->log, 0,
+                       //"http writer delayed");
+
+        //if (!wev->delayed) {
+            //ngx_add_timer(wev, clcf->send_timeout);
+        //}
+
+        //if (ngx_handle_write_event(wev, clcf->send_lowat) != NGX_OK) {
+            //ngx_http_close_request(r, 0);
+        //}
+
+        //return;
+    //}
+
+    rc = ngx_http_output_filter(r, NULL);
+
+    ngx_log_debug3(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                   "http writer output filter: %i, \"%V?%V\"",
+                   rc, &r->uri, &r->args);
+
+    if (rc == NGX_ERROR) {
+        ngx_http_finalize_request(r, rc);
+        return;
+    }
+
+    if (r->buffered || r->postponed || (r == r->main && c->buffered)) {
+        if (!wev->delayed) {
+            ngx_add_timer(wev, clcf->send_timeout);
+        }
+
+        if (ngx_handle_write_event(wev, clcf->send_lowat) != NGX_OK) {
+            ngx_http_close_request(r, 0);
+        }
+        return;
+    }
+
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, wev->log, 0,
+                   "http writer done: \"%V?%V\"", &r->uri, &r->args);
+
+    r->write_event_handler = ngx_http_request_empty_handler;
+
+    ngx_http_finalize_request(r, rc);
+}
+
+static ngx_int_t
+ngx_http_set_write_handler(ngx_http_request_t *r)
+{
+	socket_ctx_t			*sock;
+	http_connection_ctx_t	*conn;
+
+	conn = (http_connection_ctx_t*) r->connection;
+	sock = conn->socket;
+
+    r->http_state = NGX_HTTP_WRITING_REQUEST_STATE;
+
+	sock->read_handler = ngx_http_test_reading;
+    //r->read_event_handler = r->discard_body ?
+                                //ngx_http_discarded_request_body_handler:
+                                //ngx_http_test_reading;
+    //r->write_event_handler = ngx_http_writer;
+
+	//if error then error
+	return io_poll_ctl(sock->io, IO_EVENT_READ | IO_EVENT_WRITE, IO_CTL_MOD, sock);
+}
