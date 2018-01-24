@@ -41,6 +41,14 @@ http_connection_ctx_t* http_connection_create(config_t* conf)
 		return NULL;
 	}
 
+	hc->buf = ngx_create_temp_buf(pool, conn_conf->buffer_size);
+	if(!hc->buf)
+	{
+		printf("Failed allocation connection buffer!\n");
+		ngx_destroy_pool(pool);
+		return NULL;
+	}
+
 	hc->conf = conf;
 	hc->pool = pool;
 
@@ -81,7 +89,7 @@ int http_listner_init_handler(config_t* conf, socket_ctx_t* socket)
 	socket->read_handler = http_connection_accept;
 	if(io_poll_ctl(io_ctx, IO_CTL_ADD, IO_EVENT_READ, socket) == NMINX_ERROR)
 	{
-		printf("Failed attach read event to socket!\n");
+		printf("Failed attach read event to socket, fd: %d, err: %s!\n", socket->fd, strerror(errno));
 		return NMINX_ERROR;
 	}
 	return NMINX_OK;
@@ -110,6 +118,7 @@ void http_connection_accept(socket_ctx_t* l_socket)
 	hc->socket = c_socket;
 	hc->serv = s_ctx;
 
+	c_socket->data = (void*) hc;
 	c_socket->read_handler = http_connection_request_handler;
 	c_socket->error_hanler = http_connection_errror_handler;
 	if(server_add_socket(s_ctx, c_socket) == NMINX_ERROR)
@@ -242,5 +251,4 @@ void http_connection_errror_handler(socket_ctx_t* socket)
 	}
 
 	http_connection_close(hc);
-	http_connection_destroy(hc);
 }

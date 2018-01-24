@@ -12,13 +12,13 @@ typedef struct http_request_config_s http_request_config_t;
 
 #define CONFIG_SLOTS_COUNT 8
 #define CONFIG_SLOT_1 0
-#define CONFIG_SLOT_2 0
-#define CONFIG_SLOT_3 0
-#define CONFIG_SLOT_4 0
-#define CONFIG_SLOT_5 0
-#define CONFIG_SLOT_6 0
-#define CONFIG_SLOT_7 0
-#define CONFIG_SLOT_8 0
+#define CONFIG_SLOT_2 1
+#define CONFIG_SLOT_3 2
+#define CONFIG_SLOT_4 3
+#define CONFIG_SLOT_5 4
+#define CONFIG_SLOT_6 5
+#define CONFIG_SLOT_7 6
+#define CONFIG_SLOT_8 7
 
 #define get_io_conf(mc) (mtcp_config_t*) mc->slots[CONFIG_SLOT_1]
 #define get_wdt_conf(mc) (watchdog_config_t*) mc->slots[CONFIG_SLOT_2]

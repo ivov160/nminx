@@ -36,6 +36,8 @@ server_ctx_t* server_init(config_t* conf)
 		printf("Failed initialize io system!\n");
 		return NULL;
 	}
+	s_ctx->conf = conf;
+	s_ctx->io_ctx = io_ctx;
 
 	socket_ctx_t* l_sock = socket_create(io_ctx);
 	if(!l_sock)
@@ -72,8 +74,6 @@ server_ctx_t* server_init(config_t* conf)
 		return NULL;
 	}
 
-	s_ctx->conf = conf;
-	s_ctx->io_ctx = io_ctx;
 	s_ctx->sockets[0] = l_sock;
 
 	return s_ctx;
@@ -123,17 +123,17 @@ int server_process_events(server_ctx_t* s_ctx)
 
 		if(sock->flags & IO_EVENT_ERROR)
 		{
-			//printf("IO_EVENT_ERROR\n");
+			printf("IO_EVENT_ERROR\n");
 			socket_error_action(sock);
 		}
 		else if(sock->flags & IO_EVENT_READ)
 		{
-			//printf("IO_EVENT_READ\n");
+			printf("IO_EVENT_READ\n");
 			socket_read_action(sock);
 		}
 		else if(sock->flags & IO_EVENT_WRITE)
 		{
-			//printf("IO_EVENT_WRITE\n");
+			printf("IO_EVENT_WRITE\n");
 			socket_write_action(sock);
 		}
 		else

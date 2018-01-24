@@ -314,7 +314,7 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
             return NGX_OK;
         }
 
-        printf("the http output chain is empty");
+        printf("the http output chain is empty\n");
         //ngx_debug_point();
         return NGX_ERROR;
     }
@@ -327,6 +327,7 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
 
 	///@todo implement send_chin
     //chain = c->send_chain(c, r->out, limit);
+	chain = ngx_send_chain(c, r->out, limit);
 
     //ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
                    //"http write filter %p", chain);

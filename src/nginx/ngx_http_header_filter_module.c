@@ -124,7 +124,7 @@ ngx_http_send_header(ngx_http_request_t *r)
 	}
 
     if (r->header_sent) {
-        printf("header already sent");
+        printf("header already senti\n");
         return NGX_ERROR;
     }
 
@@ -153,7 +153,8 @@ ngx_http_header_filter(ngx_http_request_t *r)
 	u_char					  ngx_time_now_buf[sizeof("Mon, 28 Sep 1970 06:00:00 GMT")];
 	ngx_str_t				  ngx_time_now;
 
-	ngx_time_now.data = ngx_http_time(ngx_time_now_buf, time(NULL));
+	ngx_http_time(ngx_time_now_buf, time(NULL));
+	ngx_time_now.data = ngx_time_now_buf;
 	ngx_time_now.len = sizeof(ngx_time_now_buf);
 
     if (r->header_sent) {

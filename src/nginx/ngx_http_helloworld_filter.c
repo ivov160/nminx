@@ -21,8 +21,9 @@ ngx_http_helloworld_filter(ngx_http_request_t *r)
 	r->keepalive = 0;
 	r->header_only = 1;
 	r->headers_out.status = NGX_HTTP_OK;
-	r->headers_out.content_length_n = 0;
+	r->headers_out.content_length_n = msg_len;
 
+	//return ngx_http_send_header(r);
 	rc = ngx_http_send_header(r);
 	if(rc == NGX_ERROR) {
 		return rc;
@@ -33,7 +34,11 @@ ngx_http_helloworld_filter(ngx_http_request_t *r)
         return NGX_ERROR;
     }
 
-    b->last = ngx_cpymem(b->last, msg, msg_len);
+    ngx_cpymem(b->last, msg, msg_len);
+	b->last += msg_len;
+
+    b->last_buf = 1;
+    b->last_in_chain = 1;
 
     out.buf = b;
     out.next = NULL;

@@ -5,12 +5,14 @@
 #include <nminx/watchdog.h>
 #include <nminx/http_connection.h>
 
+#include <nginx/ngx_core.h>
 #include <nginx/ngx_palloc.h>
 
 /** def configs */
 static mtcp_config_t mtcp_conf = {
 	0, /* cpu */
 	MAX_CONNECTIONS, /* max_events */
+	"config/nminx.conf", /* config_path */
 };
 
 static connection_config_t conn_conf = {
@@ -257,6 +259,9 @@ int main(int argc, char* argv[])
 	set_serv_conf(pconf, &serv_conf);
 	set_conn_conf(pconf, &conn_conf);
 	set_http_req_conf(pconf, &http_req_conf);
+
+
+	ngx_cpuinfo();
 
 	// initialize wdt_process
 	//process_config_t mp_cfg = { 0 };

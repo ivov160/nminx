@@ -99,7 +99,7 @@ typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 #define ngx_max(val1, val2)  ((val1 < val2) ? (val2) : (val1))
 #define ngx_min(val1, val2)  ((val1 > val2) ? (val2) : (val1))
 
-//void ngx_cpuinfo(void);
+void ngx_cpuinfo(void);
 
 #if (NGX_HAVE_OPENAT)
 #define NGX_DISABLE_SYMLINKS_OFF        0

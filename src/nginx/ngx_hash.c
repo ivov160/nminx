@@ -258,7 +258,7 @@ ngx_hash_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names, ngx_uint_t nelts)
 
     if (hinit->max_size == 0) {
         printf("could not build %s, you should "
-				  "increase %s_max_size: %lu",
+				  "increase %s_max_size: %lu\n",
 				  hinit->name, hinit->name, hinit->max_size);
         return NGX_ERROR;
     }
@@ -267,7 +267,7 @@ ngx_hash_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names, ngx_uint_t nelts)
         if (hinit->bucket_size < NGX_HASH_ELT_SIZE(&names[n]) + sizeof(void *))
         {
             printf( "could not build %s, you should "
-					  "increase %s_bucket_size: %lu",
+					  "increase %s_bucket_size: %lu\n",
 					  hinit->name, hinit->name, hinit->bucket_size);
             return NGX_ERROR;
         }

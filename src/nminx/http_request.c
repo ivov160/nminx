@@ -389,7 +389,6 @@ ngx_http_process_request_line(socket_ctx_t* socket)
         rc = ngx_http_parse_request_line(r, r->header_in);
 
         if (rc == NGX_OK) {
-
             /* the request line has been parsed successfully */
 
             r->request_line.len = r->request_end - r->request_start;
@@ -979,6 +978,7 @@ void ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
 		r->header_only = 1;
 		r->headers_out.status = rc;
 		r->headers_out.content_length_n = 0;
+
 		ngx_http_finalize_request(r, ngx_http_send_header(r));
         return;
     }
@@ -988,14 +988,6 @@ void ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
 	if(r->out) {
         if (ngx_http_set_write_handler(r) != NGX_OK) {
             ngx_http_terminate_request(r, 0);
-			//if(ngx_http_set_write_handler(r) == NGX_ERROR) {
-				////close connection
-			//}
-
-			//sock->write_handler = ngx_http_write_content_handler;
-			//if(io_poll_ctl(sock->io, IO_EVENT_WRITE, IO_CTL_MOD, sock) == NGX_ERROR) {
-				////close connection
-			//}
         }
 		return;
     }
@@ -1179,7 +1171,7 @@ ngx_http_test_reading(ngx_http_request_t *r)
         c->error = 1;
         err = 0;
 
-        //goto closed;
+		goto closed;
     } else if (n == -1) {
         err = ngx_socket_errno;
 
@@ -1187,7 +1179,7 @@ ngx_http_test_reading(ngx_http_request_t *r)
             //rev->eof = 1;
             c->error = 1;
 
-            //goto closed;
+			goto closed;
         }
     }
     //[> aio does not call this handler <]
@@ -1196,15 +1188,15 @@ ngx_http_test_reading(ngx_http_request_t *r)
             //ngx_http_close_request(r, 0);
         //}
     //}
-    //return;
+	return;
 
-//closed:
+closed:
 
     //if (err) {
         //rev->error = 1;
     //}
 
-    printf("client prematurely closed connection");
+    printf("client prematurely closed connection\n");
 	ngx_http_finalize_request(c->request, NGX_HTTP_CLIENT_CLOSED_REQUEST);
 }
 
@@ -1245,6 +1237,15 @@ ngx_http_set_write_handler(ngx_http_request_t *r)
 								 
 	r->read_event_handler = ngx_http_test_reading;
 	r->write_event_handler = ngx_http_writer;
+
+	//if(ngx_http_set_write_handler(r) == NGX_ERROR) {
+		////close connection
+	//}
+
+	//sock->write_handler = ngx_http_write_content_handler;
+	//if(io_poll_ctl(sock->io, IO_EVENT_WRITE, IO_CTL_MOD, sock) == NGX_ERROR) {
+		////close connection
+	//}
 
 	//if error then error
 	return io_poll_ctl(sock->io, IO_EVENT_READ | IO_EVENT_WRITE, IO_CTL_MOD, sock);
@@ -1541,7 +1542,7 @@ ngx_http_init_headers_in_hash(config_t *cf, http_request_config_t *hrc)
     hash.hash = &hrc->headers_in_hash;
     hash.key = ngx_hash_key_lc;
     hash.max_size = 512;
-    hash.bucket_size = ngx_align(64, ngx_cacheline_size);
+	hash.bucket_size = ngx_align(64, ngx_cacheline_size);
     hash.name = "headers_in_hash";
     hash.pool = cf->pool;
     hash.temp_pool = NULL;
