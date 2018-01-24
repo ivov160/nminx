@@ -234,6 +234,8 @@ static int debug_process(void* data)
 
 int main(int argc, char* argv[]) 
 {
+	ngx_cpuinfo();
+
 	// initialize application config
 	config_t m_cfg = { 0 };
 	config_t* pconf = &m_cfg;
@@ -259,9 +261,6 @@ int main(int argc, char* argv[])
 	set_serv_conf(pconf, &serv_conf);
 	set_conn_conf(pconf, &conn_conf);
 	set_http_req_conf(pconf, &http_req_conf);
-
-
-	ngx_cpuinfo();
 
 	// initialize wdt_process
 	//process_config_t mp_cfg = { 0 };

@@ -100,6 +100,12 @@ void http_connection_accept(socket_ctx_t* l_socket)
 	server_ctx_t* s_ctx = (server_ctx_t*) l_socket->data;
 	config_t* conf = s_ctx->conf;
 
+	if(s_ctx->free_slots == 0)
+	{
+		printf("Server slots is full\n");
+		return;
+	}
+
 	socket_ctx_t* c_socket = socket_accept(l_socket);
 	if(!c_socket)
 	{

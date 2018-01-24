@@ -9,6 +9,8 @@ typedef void (*cleanup_handler_t)(void*);
 struct socket_ctx_s
 {
 	int fd;
+	int index;
+
 	int flags;
 
 	io_ctx_t* io;

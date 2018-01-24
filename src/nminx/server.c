@@ -75,6 +75,7 @@ server_ctx_t* server_init(config_t* conf)
 	}
 
 	s_ctx->sockets[0] = l_sock;
+	s_ctx->free_slots = MAX_CONNECTIONS - 1;
 
 	return s_ctx;
 }
@@ -84,12 +85,9 @@ void server_destroy(server_ctx_t* s_ctx)
 	if(s_ctx == &server_ctx)
 	{
 		// from back, because index 0 is contains a listen socket
-		for(int i = MAX_CONNECTIONS; i >= 0; --i)
+		for(int i = MAX_CONNECTIONS - 1; i >= 0; --i)
 		{
-			if(s_ctx->sockets[i])
-			{
-				server_rm_socket(s_ctx, s_ctx->sockets[i]);
-			}
+			server_rm_socket(s_ctx, s_ctx->sockets[i]);
 		}
 
 		if(s_ctx->io_ctx)
@@ -146,22 +144,35 @@ int server_process_events(server_ctx_t* s_ctx)
 
 int server_add_socket(server_ctx_t* s_ctx, socket_ctx_t* sock)
 {
-	socket_ctx_t* cs = s_ctx->sockets[sock->fd];
-	if(cs != NULL)
+	for(uint32_t i = 1; i < MAX_CONNECTIONS; ++i)
 	{
-		printf("Duplicate socket fd: %d\n", sock->fd);
-		return NMINX_ERROR;
+		socket_ctx_t* cs = s_ctx->sockets[i];
+		if(cs == NULL)
+		{
+			cs = sock;
+			sock->index = i;
+		}
 	}
 
-	s_ctx->sockets[sock->fd] = sock;
+	if(sock->index == 0)
+	{
+		return NMINX_AGAIN;
+	}
+
+	s_ctx->free_slots--;
 	return NMINX_OK;
 }
 
 void server_rm_socket(server_ctx_t* s_ctx, socket_ctx_t* sock)
 {
-	s_ctx->sockets[sock->fd] = NULL;
-	socket_close(sock);
-	socket_destroy(sock);
+	if(sock != NULL)
+	{
+		s_ctx->sockets[sock->index] = NULL;
+		socket_close(sock);
+		socket_destroy(sock);
+
+		s_ctx->free_slots++;
+	}
 }
 
 static void server_close_listener(socket_ctx_t* sock)

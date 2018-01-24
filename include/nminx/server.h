@@ -13,6 +13,7 @@ struct server_ctx_s
 	socket_ctx_t* sockets[MAX_CONNECTIONS];
 
 	int is_run;
+	uint32_t free_slots;
 };
 
 server_ctx_t* server_init(config_t* conf);

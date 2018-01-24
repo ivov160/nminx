@@ -13,8 +13,13 @@ option(SYSTEM_MTCP	"Use system mTcp" OFF)
 option(MTCP_FLAGS	"mTCP flags for build" OFF)
 option(MTCP_CFLAGS	"mTCP cflags for build" OFF)
 
-#added cmake folder to cmake modules search
+# added cmake folder to cmake modules search
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+
+# output dirrectories
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 # Settings
 include(nginx)
@@ -99,3 +104,12 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_C_FLAGS}")
 add_executable(${PROJECT_NAME} ${app_src})
 target_link_libraries(${PROJECT_NAME} ${MTCP_LIBRARY} ${NUMA_LIBRARY})
 
+# Strip files
+if(NOT ${CMAKE_BUILD_TYPE} MATCHES "DEB")
+    add_custom_target(strip)
+    add_custom_command(TARGET strip
+                       POST_BUILD
+                       COMMAND strip ${target}
+                       WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    )
+endif()

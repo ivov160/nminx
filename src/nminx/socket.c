@@ -109,13 +109,6 @@ socket_ctx_t* socket_accept(socket_ctx_t* socket)
 		int c_fd = mtcp_accept(io->mctx, socket->fd, NULL, NULL);
 		if(c_fd >= 0) 
 		{
-			if(c_fd >= MAX_CONNECTIONS) 
-			{
-				printf("Invalid socket id %d.\n", c_fd);
-				errno = ENFILE;
-				return NULL;
-			}
-
 			if(mtcp_setsock_nonblock(io->mctx, c_fd) < 0) 
 			{
 				printf("Failed to set socket in nonblocking mode.\n");

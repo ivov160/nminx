@@ -18,7 +18,6 @@ static ngx_int_t ngx_http_alloc_large_header_buffer(ngx_http_request_t *r, ngx_u
 static void ngx_http_writer(ngx_http_request_t *r);
 
 static void ngx_http_write_stub_handler(socket_ctx_t* socket);
-static void ngx_http_write_content_handler(socket_ctx_t* socket);
 
 static ngx_int_t ngx_http_validate_host(ngx_str_t *host, ngx_pool_t *pool, ngx_uint_t alloc);
 static void ngx_http_set_exten(ngx_http_request_t *r);
@@ -176,10 +175,6 @@ ngx_http_header_t  ngx_http_headers_in[] = {
     { ngx_null_string, 0, NULL }
 };
 
-//ngx_http_output_header_filter_pt  ngx_http_top_header_filter;
-//ngx_http_output_body_filter_pt    ngx_http_top_body_filter;
-//ngx_http_request_body_filter_pt   ngx_http_top_request_body_filter;
-
 ngx_http_request_t* 
 http_request_create(http_connection_ctx_t* ctx)
 {
@@ -264,9 +259,6 @@ void http_request_close(ngx_http_request_t* r)
 
 	hc = r->connection;
 
-	///@todo add handling for keepalive
-	//if(r->keepalive) {}
-	
 	http_connection_close(hc);
 }
 
@@ -278,9 +270,6 @@ http_request_init_config(config_t* conf)
 	{
 		return NMINX_ERROR;
 	}
-
-    //ngx_http_top_body_filter = ngx_http_write_filter;
-
 	return NMINX_OK;
 }
 
@@ -317,9 +306,6 @@ ngx_http_block_reading(ngx_http_request_t *r)
 void
 ngx_http_request_empty_handler(ngx_http_request_t *r)
 {
-    //ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   //"http request empty handler");
-
     return;
 }
 
@@ -895,6 +881,7 @@ ngx_http_handler(ngx_http_request_t *r)
 #endif
 
 	ngx_http_finalize_request(r, ngx_http_helloworld_filter(r));
+	//ngx_http_finalize_request(r, NGX_HTTP_NOT_MODIFIED);
 }
 
 static void
@@ -923,7 +910,6 @@ ngx_http_request_handler(socket_ctx_t* sock)
     }
 }
 
-///@todo need logick for handling rc status
 void ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
 {
 	http_connection_ctx_t	  *c;
@@ -942,14 +928,6 @@ void ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
 	if (rc == NGX_OK && r->filter_finalize) {
 		c->error = 1;
 	}
-
-	// NGX_DECLAINED - is a dicline phase
-    //if (rc == NGX_DECLINED) {
-        //r->content_handler = NULL;
-        //r->write_event_handler = ngx_http_core_run_phases;
-        //ngx_http_core_run_phases(r);
-        //return;
-    //}
 
     if (rc == NGX_ERROR
         || rc == NGX_HTTP_REQUEST_TIME_OUT
@@ -983,9 +961,8 @@ void ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
         return;
     }
 
-    //if (r->buffered || c->buffered || r->postponed) {
-	//if (r->buffered) {
 	if(r->out) {
+		printf("finalize r->out\n");
         if (ngx_http_set_write_handler(r) != NGX_OK) {
             ngx_http_terminate_request(r, 0);
         }
@@ -1211,8 +1188,7 @@ ngx_http_writer(ngx_http_request_t *r)
 
 	if(r->out)
 	{	//write output
-		//rc = chain_write(r->out);
-		ngx_http_finalize_request(r, rc);
+		ngx_http_finalize_request(r, ngx_http_write_filter(r, NULL));
 	}
 	else 
 	{
@@ -1231,21 +1207,8 @@ ngx_http_set_write_handler(ngx_http_request_t *r)
 
     r->http_state = NGX_HTTP_WRITING_REQUEST_STATE;
 
-	//r->read_event_handler = r->discard_body ?
-                                //ngx_http_discarded_request_body_handler:
-								//ngx_http_test_reading;   
-								 
 	r->read_event_handler = ngx_http_test_reading;
 	r->write_event_handler = ngx_http_writer;
-
-	//if(ngx_http_set_write_handler(r) == NGX_ERROR) {
-		////close connection
-	//}
-
-	//sock->write_handler = ngx_http_write_content_handler;
-	//if(io_poll_ctl(sock->io, IO_EVENT_WRITE, IO_CTL_MOD, sock) == NGX_ERROR) {
-		////close connection
-	//}
 
 	//if error then error
 	return io_poll_ctl(sock->io, IO_EVENT_READ | IO_EVENT_WRITE, IO_CTL_MOD, sock);

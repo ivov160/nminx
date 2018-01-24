@@ -19,7 +19,6 @@ FIND_PATH(MTCP_INCLUDE_DIR
 		/usr/local/include
 	DOC "mTCP include directory path"
 )
-message("HZ: ${MTCP_INCLUDE_DIR}")
 
 FIND_LIBRARY(MTCP_LIBRARY
     NAMES 
