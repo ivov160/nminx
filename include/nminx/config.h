@@ -64,6 +64,8 @@ struct http_request_config_s
 	uint32_t large_buffer_chunk_count;
 	
 	uint32_t headers_flags;
+	//uint32_t postpone_output;
+	//uint32_t sendfile_max_chunk;
 
 	ngx_hash_t headers_in_hash;
 };

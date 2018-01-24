@@ -44,7 +44,7 @@ typedef void (*ngx_connection_handler_pt)(ngx_connection_t *c);
 //#include <ngx_atomic.h>
 //#include <ngx_thread.h>
 #include <nginx/ngx_rbtree.h>
-//#include <ngx_time.h>
+#include <nginx/ngx_time.h>
 //#include <ngx_socket.h>
 #include <nginx/ngx_string.h>
 #include <nginx/ngx_files.h>

@@ -3,8 +3,8 @@
 
 #include <nminx/nminx.h>
 
-typedef int (*event_handler_t)(struct socket_ctx_s*);
-typedef int (*cleanup_handler_t)(void*);
+typedef void (*event_handler_t)(struct socket_ctx_s*);
+typedef void (*cleanup_handler_t)(void*);
 
 struct socket_ctx_s
 {
@@ -14,7 +14,7 @@ struct socket_ctx_s
 	io_ctx_t* io;
 
 	void* data;
-	cleanup_handler_t cleanup_handler;
+	//cleanup_handler_t cleanup_handler;
 
 	/**
 	 * @todo	Implement event handlers as chain.
@@ -28,12 +28,14 @@ struct socket_ctx_s
 	 */
 	event_handler_t read_handler;
 	event_handler_t write_handler;
-	event_handler_t close_handler;
+	event_handler_t error_hanler;
 };
 
 
 socket_ctx_t* socket_create(io_ctx_t* io);
-int socket_destroy(socket_ctx_t* sock);
+void socket_destroy(socket_ctx_t* sock);
+
+void socket_stub_action(socket_ctx_t* socket);
 
 int socket_bind(socket_ctx_t* socket, in_addr_t ip, in_port_t port);
 int socket_listen(socket_ctx_t* socket, int backlog);
@@ -68,6 +70,6 @@ socket_writev(socket_ctx_t* socket, const struct iovec *iov, int numIOV);
 // macros for passing socket to self handlers
 #define socket_read_action(sock) sock->read_handler(sock)
 #define socket_write_action(sock) sock->write_handler(sock)
-#define socket_close_action(sock) sock->close_handler(sock)
+#define socket_error_action(sock) sock->error_hanler(sock)
 
 #endif //_NMINX_SOCKET_H

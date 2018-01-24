@@ -142,4 +142,23 @@ typedef intptr_t        ngx_flag_t;
 #endif
 
 
+#define NGX_INET_ADDRSTRLEN   (sizeof("255.255.255.255") - 1)
+#define NGX_INET6_ADDRSTRLEN                                                 \
+    (sizeof("ffff:ffff:ffff:ffff:ffff:ffff:255.255.255.255") - 1)
+#define NGX_UNIX_ADDRSTRLEN                                                  \
+    (sizeof("unix:") - 1 +                                                   \
+     sizeof(struct sockaddr_un) - offsetof(struct sockaddr_un, sun_path))
+
+#if (NGX_HAVE_UNIX_DOMAIN)
+#define NGX_SOCKADDR_STRLEN   NGX_UNIX_ADDRSTRLEN
+#elif (NGX_HAVE_INET6)
+#define NGX_SOCKADDR_STRLEN   (NGX_INET6_ADDRSTRLEN + sizeof("[]:65535") - 1)
+#else
+#define NGX_SOCKADDR_STRLEN   (NGX_INET_ADDRSTRLEN + sizeof(":65535") - 1)
+#endif
+
+/* compatibility */
+#define NGX_SOCKADDRLEN       sizeof(ngx_sockaddr_t)
+
+
 #endif /* _NGX_CONFIG_H_INCLUDED_ */

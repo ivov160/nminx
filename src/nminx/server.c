@@ -16,10 +16,7 @@
 // In plan for continue need custom memory allocation
 static server_ctx_t server_ctx = { 0 };
 
-static int server_close_listener(socket_ctx_t* sock);
-static int server_close_socket(server_ctx_t* s_ctx, socket_ctx_t* sock);
-
-static void server_io_event_handler(server_ctx_t* s_ctx, socket_ctx_t* sock, int rc);
+static void server_close_listener(socket_ctx_t* sock);
 static void server_error_event_handler(server_ctx_t* s_ctx, socket_ctx_t* sock);
 
 server_ctx_t* server_init(config_t* conf)
@@ -48,7 +45,7 @@ server_ctx_t* server_init(config_t* conf)
 		return NULL;
 	}
 	l_sock->data = (void*) s_ctx;
-	l_sock->close_handler = server_close_listener;
+	l_sock->error_hanler = server_close_listener;
 
 	in_addr_t port = serv_conf->port == 0 ? htons(DEFAULT_PORT) : serv_conf->port;
 	if(socket_bind(l_sock, serv_conf->ip, port) == NMINX_ERROR)
@@ -82,7 +79,7 @@ server_ctx_t* server_init(config_t* conf)
 	return s_ctx;
 }
 
-int server_destroy(server_ctx_t* s_ctx)
+void server_destroy(server_ctx_t* s_ctx)
 {
 	if(s_ctx == &server_ctx)
 	{
@@ -91,13 +88,7 @@ int server_destroy(server_ctx_t* s_ctx)
 		{
 			if(s_ctx->sockets[i])
 			{
-				socket_ctx_t* sock = s_ctx->sockets[i];
-
-				// finilize socket and destory 
-				socket_close_action(sock);
-				socket_destroy(sock);
-
-				s_ctx->sockets[i] = NULL;
+				server_rm_socket(s_ctx, s_ctx->sockets[i]);
 			}
 		}
 
@@ -107,7 +98,6 @@ int server_destroy(server_ctx_t* s_ctx)
 			s_ctx->io_ctx = NULL;
 		}
 	}
-	return NMINX_OK;
 }
 
 int server_process_events(server_ctx_t* s_ctx)
@@ -122,34 +112,35 @@ int server_process_events(server_ctx_t* s_ctx)
 		return errno != EINTR ? NMINX_ERROR : NMINX_ABORT;
 	}
 
+	// timeout handling 
 	for(int i = 0; i < nc; ++i)
 	{
 		socket_ctx_t* sock = sb[i];
+		if(sock == NULL)
+		{	// bad close logic
+			assert(0);
+		}
+
 		if(sock->flags & IO_EVENT_ERROR)
 		{
 			//printf("IO_EVENT_ERROR\n");
-			server_error_event_handler(s_ctx, sock);
+			socket_error_action(sock);
 		}
 		else if(sock->flags & IO_EVENT_READ)
 		{
 			//printf("IO_EVENT_READ\n");
-			//printf("socket_read_action: %d\n", result);
-			int rc = socket_read_action(sock);
-			server_io_event_handler(s_ctx, sock, rc);
+			socket_read_action(sock);
 		}
 		else if(sock->flags & IO_EVENT_WRITE)
 		{
 			//printf("IO_EVENT_WRITE\n");
-			//printf("socket_write_action: %d\n", result);
-			int rc = socket_write_action(sock);
-			server_io_event_handler(s_ctx, sock, rc);
+			socket_write_action(sock);
 		}
 		else
 		{	// unexpected flag state
 			assert(0);
 		}
 	}
-
 	return NMINX_OK;
 }
 
@@ -166,35 +157,18 @@ int server_add_socket(server_ctx_t* s_ctx, socket_ctx_t* sock)
 	return NMINX_OK;
 }
 
-static int server_close_listener(socket_ctx_t* sock)
+void server_rm_socket(server_ctx_t* s_ctx, socket_ctx_t* sock)
+{
+	s_ctx->sockets[sock->fd] = NULL;
+	socket_close(sock);
+	socket_destroy(sock);
+}
+
+static void server_close_listener(socket_ctx_t* sock)
 {
 	server_ctx_t* s_ctx = (server_ctx_t*) sock->data;
 	s_ctx->is_run = FALSE;
-
-	sock->close_handler = socket_destroy;
-	return server_close_socket(s_ctx, sock);
-}
-
-int server_close_socket(server_ctx_t* s_ctx, socket_ctx_t* sock)
-{
-	socket_close_action(sock);
-
-	s_ctx->sockets[sock->fd] = NULL;
-	return NMINX_OK;
-}
-
-static void server_io_event_handler(server_ctx_t* s_ctx, socket_ctx_t* sock, int rc)
-{
-	if(rc == NMINX_ERROR)
-	{
-		printf("Event failed socket %d, err: %s\n", 
-				sock->fd, strerror(errno));
-	}
-	
-	if(rc != NMINX_AGAIN)
-	{
-		server_close_socket(s_ctx, sock);
-	}
+	server_error_event_handler(s_ctx, sock);
 }
 
 static void server_error_event_handler(server_ctx_t* s_ctx, socket_ctx_t* sock)
@@ -218,7 +192,7 @@ static void server_error_event_handler(server_ctx_t* s_ctx, socket_ctx_t* sock)
 	{
 		printf("socket_get_option error\n");
 	}
-	server_close_socket(s_ctx, sock);
+	server_rm_socket(s_ctx, sock);
 }
 
 

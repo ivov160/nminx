@@ -7,6 +7,8 @@
 #include <nginx/ngx_core.h>
 #include <nginx/ngx_http.h>
 
+#include <nminx/http_connection.h>
+
 #ifndef _NGX_HTTP_REQUEST_H_INCLUDED_
 #define _NGX_HTTP_REQUEST_H_INCLUDED_
 
@@ -304,43 +306,13 @@ typedef struct {
 } ngx_http_request_body_t;
 
 
-typedef struct ngx_http_addr_conf_s  ngx_http_addr_conf_t;
-
-
 typedef void (*ngx_http_cleanup_pt)(void *data);
-
 typedef struct ngx_http_cleanup_s  ngx_http_cleanup_t;
 
 struct ngx_http_cleanup_s {
     ngx_http_cleanup_pt               handler;
     void                             *data;
     ngx_http_cleanup_t               *next;
-};
-
-
-typedef ngx_int_t (*ngx_http_post_subrequest_pt)(ngx_http_request_t *r,
-    void *data, ngx_int_t rc);
-
-typedef struct {
-    ngx_http_post_subrequest_pt       handler;
-    void                             *data;
-} ngx_http_post_subrequest_t;
-
-
-typedef struct ngx_http_postponed_request_s  ngx_http_postponed_request_t;
-
-struct ngx_http_postponed_request_s {
-    ngx_http_request_t               *request;
-    ngx_chain_t                      *out;
-    ngx_http_postponed_request_t     *next;
-};
-
-
-typedef struct ngx_http_posted_request_s  ngx_http_posted_request_t;
-
-struct ngx_http_posted_request_s {
-    ngx_http_request_t               *request;
-    ngx_http_posted_request_t        *next;
 };
 
 
@@ -355,12 +327,11 @@ struct ngx_http_request_s {
 	 * @note	hide connection struct 
 	 *			for connection is use not ngx_http_connection
 	 */
-	void							 *connection;
+	//void							 *connection;
+	http_connection_ctx_t			 *connection;
 
-	//int								   upstream;
-	//ngx_http_upstream_t              *upstream;
-    //ngx_array_t                      *upstream_states;
-                                         //[> of ngx_http_upstream_state_t <]
+    ngx_http_event_handler_pt         read_event_handler;
+    ngx_http_event_handler_pt         write_event_handler;
 
     ngx_pool_t                       *pool;
     ngx_buf_t                        *header_in;
@@ -371,8 +342,6 @@ struct ngx_http_request_s {
 	ngx_http_request_body_t          *request_body;
 
     time_t                            lingering_time;
-    //time_t                            start_sec;
-    //ngx_msec_t                        start_msec;
 
     ngx_uint_t                        method;
     ngx_uint_t                        http_version;
@@ -405,7 +374,6 @@ struct ngx_http_request_s {
     ngx_http_cleanup_t               *cleanup;
 
     unsigned                          count:16;
-	unsigned                          subrequests:8;
     unsigned                          blocked:8;
 
     unsigned                          aio:1;
@@ -440,7 +408,6 @@ struct ngx_http_request_s {
     unsigned                          request_body_file_log_level:3;
     unsigned                          request_body_no_buffering:1;
 
-    unsigned                          subrequest_in_memory:1;
     unsigned                          waited:1;
 
 #if (NGX_HTTP_CACHE)
@@ -496,7 +463,6 @@ struct ngx_http_request_s {
     unsigned                          filter_need_temporary:1;
     unsigned                          preserve_body:1;
     unsigned                          allow_ranges:1;
-    unsigned                          subrequest_ranges:1;
     unsigned                          single_range:1;
     unsigned                          disable_not_modified:1;
     unsigned                          stat_reading:1;
@@ -543,20 +509,14 @@ struct ngx_http_request_s {
 };
 
 
-typedef struct {
-    ngx_http_posted_request_t         terminal_posted_request;
-} ngx_http_ephemeral_t;
-
-
 #define ngx_http_ephemeral(r)  (void *) (&r->uri_start)
-
 
 extern ngx_http_header_t       ngx_http_headers_in[];
 extern ngx_http_header_out_t   ngx_http_headers_out[];
 
-
-//#define ngx_http_set_log_request(log, r)                                      \
-    //((ngx_http_log_ctx_t *) log->data)->current_request = r
+ngx_int_t ngx_http_header_filter(ngx_http_request_t *r);
+ngx_int_t ngx_http_helloworld_filter(ngx_http_request_t *r);
+ngx_int_t ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in);
 
 
 #endif /* _NGX_HTTP_REQUEST_H_INCLUDED_ */

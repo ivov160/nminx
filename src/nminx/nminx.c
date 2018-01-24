@@ -24,6 +24,8 @@ static http_request_config_t http_req_conf = {
 	4, /* large_biffer_chunk_count */
 	UNDERSCORES_IN_HEADERS | IGNORE_INVALID_HEADERS | URI_MERGE_SLASHES, /* headers_flags */
 	NULL, /* headers_in_hash */
+	//1460,  [>postpone_output <]
+	//0, [> sendfile_max_chunk <]
 };
 
 static watchdog_config_t wdt_conf = {

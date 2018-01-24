@@ -3,19 +3,10 @@
 // io implementation (mtcp) can be replaced without big refactoring
 #include "io_ctx.h"
 
-#include <stdio.h>
-#include <stdlib.h>
 
-#include <error.h>
-#include <errno.h>
-#include <string.h>
-
-#include <mtcp_api.h>
-#include <mtcp_epoll.h>
-
-static int socket_stub_action(socket_ctx_t* socket)
+void socket_stub_action(socket_ctx_t* socket)
 {
-	return NMINX_ERROR;
+	return;
 }
 
 socket_ctx_t* socket_create(io_ctx_t* io)
@@ -52,28 +43,31 @@ socket_ctx_t* socket_create(io_ctx_t* io)
 
 		sock->read_handler = socket_stub_action;
 		sock->write_handler = socket_stub_action;
-		sock->close_handler = socket_destroy;
+		sock->error_hanler = socket_stub_action;
 
-		sock->data = NULL;
-		sock->cleanup_handler = NULL;
+		//sock->data = NULL;
+		//sock->cleanup_handler = NULL;
 
 		return sock;
 	}
 	return NULL;
 }
 
-int socket_destroy(socket_ctx_t* sock)
+void socket_destroy(socket_ctx_t* sock)
 {
 	if(sock)
 	{	
-		socket_close(sock);
-
-		if(sock->cleanup_handler)
-		{
-			sock->cleanup_handler(sock->data);
-		}
-
 		free(sock);
+	}
+}
+
+int socket_close(socket_ctx_t* socket)
+{
+	if(socket)
+	{
+		///@note may be best choice will be a use io api
+		mtcp_epoll_ctl(socket->io->mctx, socket->io->ep, MTCP_EPOLL_CTL_DEL, socket->fd, NULL);
+		mtcp_close(socket->io->mctx, socket->fd);
 	}
 	return NMINX_OK;
 }
@@ -145,10 +139,10 @@ socket_ctx_t* socket_accept(socket_ctx_t* socket)
 
 			c_socket->read_handler = socket_stub_action;
 			c_socket->write_handler = socket_stub_action;
-			c_socket->close_handler = socket_close;
+			c_socket->error_hanler = socket_stub_action;
 
-			c_socket->data = NULL;
-			c_socket->cleanup_handler = NULL;
+			//c_socket->data = NULL;
+			//c_socket->cleanup_handler = NULL;
 
 			return c_socket;
 		} 
@@ -159,17 +153,6 @@ socket_ctx_t* socket_accept(socket_ctx_t* socket)
 		return NULL;
 	}
 	return NULL;
-}
-
-int socket_close(socket_ctx_t* socket)
-{
-	if(socket)
-	{
-		///@note may be best choice will be a use io api
-		mtcp_epoll_ctl(socket->io->mctx, socket->io->ep, MTCP_EPOLL_CTL_DEL, socket->fd, NULL);
-		mtcp_close(socket->io->mctx, socket->fd);
-	}
-	return NMINX_OK;
 }
 
 int socket_get_option(socket_ctx_t* sock, int level, int opt, void* data, socklen_t* len)

@@ -4,12 +4,12 @@
 #include <nginx/ngx_http.h>
 #include <nginx/ngx_palloc.h>
 
-#include "http_request.h"
+#include <nginx/ngx_http_request.h>
 
 #include <nminx/io.h>
 #include <nminx/socket.h>
 #include <nminx/server.h>
-#include <nminx/http_connection.h>
+#include <nminx/http_request.h>
 
 http_connection_ctx_t* http_connection_create(config_t* conf)
 {
@@ -43,24 +43,28 @@ http_connection_ctx_t* http_connection_create(config_t* conf)
 
 	hc->conf = conf;
 	hc->pool = pool;
-	hc->need_close = FALSE;
+
+	hc->close = FALSE;
+	hc->error = FALSE;
 
 	return hc;
 }
 
-int http_connection_destroy(http_connection_ctx_t* conn)
+void http_connection_destroy(http_connection_ctx_t* conn)
 {
 	// connection contained in pool
-	// destory_pool clear all mammory
-	if(conn->pool)
-	{
-		ngx_destroy_pool(conn->pool);
-	}
+	// destory_pool clear all memmory
+	ngx_destroy_pool(conn->pool);
+}
 
-	// now not need
-	//free(conn);
+void http_connection_close(http_connection_ctx_t* conn)
+{
+	socket_ctx_t* sock = conn->socket;
+	server_ctx_t* serv = conn->serv;
 
-	return NMINX_OK;
+	server_rm_socket(serv, sock);
+
+	http_connection_destroy(conn);
 }
 
 int http_listner_init_handler(config_t* conf, socket_ctx_t* socket)
@@ -74,17 +78,16 @@ int http_listner_init_handler(config_t* conf, socket_ctx_t* socket)
 		return NMINX_ERROR;
 	}
 
+	socket->read_handler = http_connection_accept;
 	if(io_poll_ctl(io_ctx, IO_CTL_ADD, IO_EVENT_READ, socket) == NMINX_ERROR)
 	{
 		printf("Failed attach read event to socket!\n");
 		return NMINX_ERROR;
 	}
-	socket->read_handler = http_connection_accept;
-
 	return NMINX_OK;
 }
 
-int http_connection_accept(socket_ctx_t* l_socket)
+void http_connection_accept(socket_ctx_t* l_socket)
 {
 	server_ctx_t* s_ctx = (server_ctx_t*) l_socket->data;
 	config_t* conf = s_ctx->conf;
@@ -93,50 +96,52 @@ int http_connection_accept(socket_ctx_t* l_socket)
 	if(!c_socket)
 	{
 		printf("Failed accept client!\n");
-		return NMINX_ERROR;
+		return;
 	}
 
 	http_connection_ctx_t* hc = http_connection_create(conf);
 	if(!hc)
 	{
 		printf("Failed create http_connection!\n");
-		socket_close_action(c_socket);
-		return NMINX_ERROR;
+		socket_close(c_socket);
+		socket_destroy(c_socket);
+		return;
 	}
 	hc->socket = c_socket;
+	hc->serv = s_ctx;
 
-	c_socket->data = hc;
-	c_socket->cleanup_handler = http_connection_cleanup_handler;
-
-	c_socket->read_handler = http_connection_read_handler;
-	//c_socket->write_handler = http_connection_write_handler;
-	//c_socket->close_handler = http_connection_close_handler;
-
+	c_socket->read_handler = http_connection_request_handler;
+	c_socket->error_hanler = http_connection_errror_handler;
 	if(server_add_socket(s_ctx, c_socket) == NMINX_ERROR)
 	{
 		printf("Failed add socket to server!\n");
-		// destruction of http_connection_ctx_t wil be in socket cleanup handler
-		// socket destruction wil be in close_action handler
-		socket_close_action(c_socket);
-		return NMINX_ERROR;
+		http_connection_destroy(hc);
+		socket_close(c_socket);
+		socket_destroy(c_socket);
+		return;
 	}
 
 	if(io_poll_ctl(c_socket->io, IO_CTL_ADD, IO_EVENT_READ, c_socket) == NMINX_ERROR)
 	{
 		printf("Failed attach read event to socket!\n");
-		// destruction of http_connection_ctx_t wil be in socket cleanup handler
-		// socket destruction wil be in close_action handler
-		socket_close_action(c_socket);
-		return NMINX_ERROR;
+		http_connection_close(hc);
+		return;
 	}
-	return NMINX_OK;
+	return;
 }
 
-int http_connection_read_handler(socket_ctx_t* socket)
+void http_connection_request_handler(socket_ctx_t* socket)
 {
 	http_connection_ctx_t* hc = (http_connection_ctx_t*) socket->data;
 	config_t* conf = hc->conf;
 	http_request_config_t* http_req_conf = get_http_req_conf(conf);
+
+	if(hc->close)
+	{	// close socket and destroy all asociated data
+		// connection and request if != NULL
+		http_connection_close(hc);
+		return;
+	}
 
 	uint32_t buf_size = http_req_conf->pool_size;
 	ngx_buf_t* buf = hc->buf;
@@ -146,14 +151,16 @@ int http_connection_read_handler(socket_ctx_t* socket)
 		buf = ngx_create_temp_buf(hc->pool, buf_size);
 		if(!buf)
 		{
-			return NMINX_ERROR;
+			http_connection_close(hc);
+			return;
 		}
 	}
 	else if (buf->start == NULL) 
 	{
         buf->start = ngx_palloc(hc->pool, buf_size);
         if (buf->start == NULL) {
-            return NMINX_ERROR;
+			http_connection_close(hc);
+            return;
         }
 
         buf->pos = buf->start;
@@ -171,12 +178,13 @@ int http_connection_read_handler(socket_ctx_t* socket)
         if (ngx_pfree(hc->pool, buf->start) == NMINX_OK) {
             buf->start = NULL;
         }
-		return NMINX_AGAIN;
+		return;
 	}
 
 	if(rsize < 0)
 	{
-		return NMINX_ERROR;
+		http_connection_close(hc);
+		return;
 	}
 
     buf->last += rsize;
@@ -189,7 +197,8 @@ int http_connection_read_handler(socket_ctx_t* socket)
 		if(!r)
 		{
 			printf("Failed create http_request struct!\n");
-			return NMINX_ERROR;
+			http_connection_close(hc);
+			return;
 		}
 		hc->request = r;
 	}
@@ -199,38 +208,39 @@ int http_connection_read_handler(socket_ctx_t* socket)
 	if(http_request_init_events(hc) == NMINX_ERROR)
 	{
 		printf("Failed initilize http processing events!\n");
-		return NMINX_ERROR;
+		http_request_destroy(r);
+		http_connection_close(hc);
+		return ;
 	}
-	return socket_read_action(socket);
+
+	socket_read_action(socket);
 }
 
-//int http_connection_write_handler(socket_ctx_t* socket)
-//{
-	//return NMINX_OK;
-//}
-
-//int http_connection_close_handler(socket_ctx_t* socket)
-//{
-	/////@todo need check control flags
-	////http_connection_ctx_t* hc = (http_connection_ctx_t*) socket->data;
-	////http_connection_destroy(hc);
-
-	//socket_destroy(socket);
-	//return NMINX_OK;
-//}
-
-int http_connection_cleanup_handler(void* data)
+void http_connection_errror_handler(socket_ctx_t* socket)
 {
-	http_connection_ctx_t* hc = (http_connection_ctx_t*) data;
+	http_connection_ctx_t* hc = 
+		(http_connection_ctx_t*) socket->data;
 
-	if(hc->request != NULL)
+	int err = 0;
+	socklen_t len = sizeof(err);
+
+	if(socket_get_option(socket, SOL_SOCKET, SO_ERROR, (void*) &err, &len) == NMINX_OK)
 	{
-		http_request_destroy(hc->request);
-		hc->request = NULL;
+		if(err != ETIMEDOUT)
+		{
+			printf("Error on socket %d, error: %s\n", 
+					socket->fd, strerror(err));
+		}
+		else
+		{
+			printf("Timeout on socket %d\n", socket->fd);
+		}
+	}
+	else
+	{
+		printf("socket_get_option error\n");
 	}
 
+	http_connection_close(hc);
 	http_connection_destroy(hc);
-
-	return NMINX_OK;
 }
-

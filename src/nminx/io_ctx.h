@@ -2,6 +2,7 @@
 #define _NMINX_IO_CTX_H
 
 #include <mtcp_api.h>
+#include <mtcp_epoll.h>
 
 // pimpl data for io
 struct io_ctx_s 
