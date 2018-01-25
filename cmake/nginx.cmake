@@ -40,13 +40,13 @@ endmacro()
 macro(nginx_configure folder result)
 	message(STATUS "Configure Nginx headers")
 	execute_process(
-		COMMAND ./configure ${NGINX_FLAGS}
+		COMMAND ./configure --without-pcre --without-http_rewrite_module
 		WORKING_DIRECTORY ${folder}/nginx-${NGINX_VERSION}
 		RESULT_VARIABLE ngx_configure_code
 		OUTPUT_VARIABLE execute_ngx_configure_result)
 
 	if(NOT ${ngx_configure_code} EQUAL 0)
-		message(FATAL_ERROR "Could not configure nginx-${NGINX_VERSION}, flags: ${NGINX_FLAGS}")
+		message(FATAL_ERROR "Could not configure nginx-${NGINX_VERSION}")
 	endif()
 	set(${result} TRUE)
 endmacro()

@@ -52,7 +52,6 @@ endif()
 
 set(THIRD_PARTY_PATH "${CMAKE_SOURCE_DIR}/third_party")
 set(NGINX_VERSION "1.13.8")
-set(NGINX_FLAGS "--without-pcre --without-http_rewrite_module")
 set(NGINX_PATH "${THIRD_PARTY_PATH}/nginx-${NGINX_VERSION}")
 
 nginx_exists(${THIRD_PARTY_PATH} NGINX_SRC_FOUND)
@@ -66,7 +65,7 @@ if(NOT ${NGINX_SRC_FOUND})
 
 	nginx_configure(${THIRD_PARTY_PATH} NGINX_CONFIGURE_RESULT)
 	if(NOT ${NGINX_CONFIGURE_RESULT})
-		message(FATAL_ERROR "Could not configure nginx with flags: ${NGINX_FLAGS}")
+		message(FATAL_ERROR "Could not configure nginx")
 	endif()
 endif()
 
