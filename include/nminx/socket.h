@@ -14,34 +14,29 @@
  * @{
  */
 
+/**
+ * @brief Сигнатура обработчика событий
+ */
 typedef void (*event_handler_t)(struct socket_ctx_s*);
-typedef void (*cleanup_handler_t)(void*);
 
+/**
+ * @brief Структура для работы с сокетом
+ * Предоставляет абстракцию для работы с сокетами
+ */
 struct socket_ctx_s
 {
-	int fd;
-	int index;
+	int fd;								///< дескриптор сокета
+	int index;							///< слот сокета в сервере
 
-	int flags;
+	int flags;							///< флаги событий
 
-	io_ctx_t* io;
+	io_ctx_t* io;						///< дескриптор для управление событиями
 
-	void* data;
-	//cleanup_handler_t cleanup_handler;
+	void* data;							///< пользовательские данные
 
-	/**
-	 * @todo	Implement event handlers as chain.
-	 * 
-	 *			When logic grow in depth every new layer 
-	 *			must copy prev handler or reimplement him.
-	 *			This is first step to copy&paste, it is bad idea
-	 *			If event handling wil be a chain every new layer of logic 
-	 *			just add self handler to a chain head. 
-	 *			And do not touch prev event handlers.
-	 */
-	event_handler_t read_handler;
-	event_handler_t write_handler;
-	event_handler_t error_hanler;
+	event_handler_t read_handler;		///< обработчик события чтения
+	event_handler_t write_handler;		///< обработчик события записи
+	event_handler_t error_hanler;		///< обработчик события ошибки
 };
 
 
@@ -59,10 +54,6 @@ int socket_close(socket_ctx_t* socket);
 int socket_get_option(socket_ctx_t* sock, int level, int opt, void* data, socklen_t* len);
 int socket_set_option(socket_ctx_t* sock, int level, int opt, const void* data, socklen_t len);
 
-/**
- * @todo	incapsulate io error handling to socket io functions
- *			example in socket_read
- */
 ssize_t
 socket_read(socket_ctx_t* socket, char *buf, size_t len);
 
