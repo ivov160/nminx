@@ -97,16 +97,12 @@ if(NOT ${SYSTEM_MTCP})
 		if(NOT ${MTCP_CONFIGURE_RESULT})
 			message(FATAL_ERROR "Could not configure mtcp with cflags: ${MTCP_CFLAGS} flags: ${MTCP_FLAGS}")
 		endif()
-	endif()
 
-	add_custom_target(mtcp_build ALL
-		COMMAND
-		${CMAKE_COMMAND} 
-		-DMTCP_FLAGS=${MTCP_FLAGS}
-		-DMTCP_CFLAGS=${MTCP_CFLAGS}
-		-DTHIRD_PARTY_PATH=${THIRD_PARTY_PATH}
-		-DCMAKE_MODULE_PATH=${CMAKE_MODULE_PATH}
-		-P ${CMAKE_SOURCE_DIR}/cmake/mtcp_build.cmake)
+		mtcp_build(${THIRD_PARTY_PATH} MTCP_BUILD_RESULT)
+		if(NOT ${MTCP_BUILD_RESULT})
+			message(FATAL_ERROR "Could not build mtcp")
+		endif()
+	endif()
 
 	set(CMAKE_INCLUDE_PATH "${THIRD_PARTY_PATH}/mtcp/mtcp/include")
 	set(CMAKE_LIBRARY_PATH "${THIRD_PARTY_PATH}/mtcp/mtcp/lib")
@@ -132,11 +128,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_C_FLAGS}")
 ## Source files
 add_executable(${PROJECT_NAME} ${app_src})
 target_link_libraries(${PROJECT_NAME} ${MTCP_LIBRARY} ${NUMA_LIBRARY})
-
-if(NOT ${SYSTEM_MTCP})
-	add_dependencies(${PROJECT_NAME} mtcp_build)
-endif()
-
 
 # Strip files
 if(NOT ${CMAKE_BUILD_TYPE} MATCHES "DEB")
