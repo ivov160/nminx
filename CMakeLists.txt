@@ -52,7 +52,7 @@ endif()
 
 set(THIRD_PARTY_PATH "${CMAKE_SOURCE_DIR}/third_party")
 set(NGINX_VERSION "1.13.8")
-set(NGINX_FLAGS "")
+set(NGINX_FLAGS "--without-pcre --without-http_rewrite_module")
 set(NGINX_PATH "${THIRD_PARTY_PATH}/nginx-${NGINX_VERSION}")
 
 nginx_exists(${THIRD_PARTY_PATH} NGINX_SRC_FOUND)
