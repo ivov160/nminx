@@ -3,6 +3,17 @@
 
 #include <nminx/nminx.h>
 
+/**
+ * @defgroup socket Socket 
+ * @brief Работа с сокетами
+ * 
+ * Является небольшой оберткой для mtcp
+ * На тот случай если нужно будет менять
+ *
+ * @addtogroup socket
+ * @{
+ */
+
 typedef void (*event_handler_t)(struct socket_ctx_s*);
 typedef void (*cleanup_handler_t)(void*);
 
@@ -73,5 +84,9 @@ socket_writev(socket_ctx_t* socket, const struct iovec *iov, int numIOV);
 #define socket_read_action(sock) sock->read_handler(sock)
 #define socket_write_action(sock) sock->write_handler(sock)
 #define socket_error_action(sock) sock->error_hanler(sock)
+
+/**
+ * @}
+ */
 
 #endif //_NMINX_SOCKET_H

@@ -17,8 +17,6 @@ static ngx_int_t ngx_http_alloc_large_header_buffer(ngx_http_request_t *r, ngx_u
 
 static void ngx_http_writer(ngx_http_request_t *r);
 
-static void ngx_http_write_stub_handler(socket_ctx_t* socket);
-
 static ngx_int_t ngx_http_validate_host(ngx_str_t *host, ngx_pool_t *pool, ngx_uint_t alloc);
 static void ngx_http_set_exten(ngx_http_request_t *r);
 
@@ -202,20 +200,7 @@ http_request_create(http_connection_ctx_t* ctx)
     r->pool = pool;
 	r->connection = hc;
 
-	/**
-	 * @note	In nginx this code disable event polling for current connection
-	 */
 	r->read_event_handler = ngx_http_block_reading;
-
-	/**
-	 * @note	In nginx http_connection can hold large buffer 
-	 *			If http request size mutch more then connection buffer 
-	 *
-	 * ngx_http_request.c:555
-	 * @code{.c}
-	 *		r->header_in = hc->busy ? hc->busy->buf : c->buffer;
-	 * @endcode
-	 */
     r->header_in = hc->lb->busy ? hc->lb->busy->buf : hc->buf;
 
     if (ngx_list_init(&r->headers_out.headers, r->pool, 20,
@@ -279,7 +264,7 @@ http_request_init_events(http_connection_ctx_t* ctx)
 	socket_ctx_t* socket = ctx->socket;
 
 	socket->read_handler = ngx_http_process_request_line;
-	socket->write_handler = ngx_http_write_stub_handler;
+	socket->write_handler = socket_stub_action;
 	socket->error_hanler = ngx_http_request_error_handler;
 
 	return NMINX_OK;
@@ -289,18 +274,7 @@ http_request_init_events(http_connection_ctx_t* ctx)
 void
 ngx_http_block_reading(ngx_http_request_t *r)
 {
-	//ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-				   //"http reading blocked");
-
-	//[> aio does not call this handler <]
-
-	//if ((ngx_event_flags & NGX_USE_LEVEL_EVENT)
-		//&& r->connection->read->active)
-	//{
-		//if (ngx_del_event(r->connection->read, NGX_READ_EVENT, 0) != NGX_OK) {
-			//ngx_http_close_request(r, 0);
-		//}
-	//}
+	return;
 }
 
 void
@@ -309,11 +283,6 @@ ngx_http_request_empty_handler(ngx_http_request_t *r)
     return;
 }
 
-
-static void ngx_http_write_stub_handler(socket_ctx_t* socket)
-{
-	return;
-}
 
 static void ngx_http_request_error_handler(socket_ctx_t* socket)
 {
@@ -356,9 +325,6 @@ ngx_http_process_request_line(socket_ctx_t* socket)
 
 	c = (http_connection_ctx_t*) socket->data;
 	r = c->request;
-
-    //ngx_log_debug0(NGX_LOG_DEBUG_HTTP, rev->log, 0,
-                   //"http process request line");
 
     rc = NGX_AGAIN;
 
@@ -487,10 +453,6 @@ ngx_http_process_request_headers(socket_ctx_t* socket)
 	conf = c->conf;
 	hrc = get_http_req_conf(conf);
 
-
-    //ngx_log_debug0(NGX_LOG_DEBUG_HTTP, rev->log, 0,
-                   //"http process request header line");
-
     rc = NGX_AGAIN;
 
     for ( ;; ) {
@@ -580,24 +542,16 @@ ngx_http_process_request_headers(socket_ctx_t* socket)
 				return;
 			}
 
-            //ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                           //"http header: \"%V: %V\"",
-                           //&h->key, &h->value);
-
             continue;
         }
 
         if (rc == NGX_HTTP_PARSE_HEADER_DONE) {
             /* a whole header has been parsed successfully */
 
-            //ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                           //"http header done");
-
             r->request_length += r->header_in->pos - r->header_name_start;
 
             r->http_state = NGX_HTTP_PROCESS_REQUEST_STATE;
 
-			///@note validate request headers
             rc = ngx_http_process_request_header(r);
             if (rc != NGX_OK) {
                 return;
@@ -819,10 +773,6 @@ ngx_http_process_request_header(ngx_http_request_t *r)
 
     if (r->headers_in.connection_type == NGX_HTTP_CONNECTION_KEEP_ALIVE) {
         if (r->headers_in.keep_alive) {
-			///@note disable keep-alive
-            //r->headers_in.keep_alive_n =
-                            //ngx_atotm(r->headers_in.keep_alive->value.data,
-                                      //r->headers_in.keep_alive->value.len);
             ngx_http_finalize_request(r, NGX_HTTP_NOT_IMPLEMENTED);
             return NGX_ERROR;
         }
@@ -881,7 +831,6 @@ ngx_http_handler(ngx_http_request_t *r)
 #endif
 
 	ngx_http_finalize_request(r, ngx_http_helloworld_filter(r));
-	//ngx_http_finalize_request(r, NGX_HTTP_NOT_MODIFIED);
 }
 
 static void
@@ -892,11 +841,6 @@ ngx_http_request_handler(socket_ctx_t* sock)
 
 	c = (http_connection_ctx_t*) sock->data;
     r = c->request;
-
-    //ngx_http_set_log_request(c->log, r);
-
-    //ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                   //"http run request: \"%V?%V\"", &r->uri, &r->args);
 
     if (c->close || c->error) {
         ngx_http_terminate_request(r, 0);
@@ -961,13 +905,12 @@ void ngx_http_finalize_request(ngx_http_request_t *r, ngx_int_t rc)
         return;
     }
 
-	if(r->out) {
-		printf("finalize r->out\n");
-        if (ngx_http_set_write_handler(r) != NGX_OK) {
-            ngx_http_terminate_request(r, 0);
-        }
-		return;
-    }
+	//if(r->out) {
+        //if (ngx_http_set_write_handler(r) != NGX_OK) {
+            //ngx_http_terminate_request(r, 0);
+        //}
+		//return;
+    //}
 
 	// mark request as done
     r->done = 1;
@@ -1020,9 +963,6 @@ ngx_http_terminate_request(ngx_http_request_t *r, ngx_int_t rc)
     mr = r;
 	hc = mr->connection;
 
-    //ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   //"http terminate request count:%d", mr->count);
-
 	if (rc > 0 && (mr->headers_out.status == 0 || hc->sent == 0)) {
 		mr->headers_out.status = rc;
 	}
@@ -1038,10 +978,6 @@ ngx_http_terminate_request(ngx_http_request_t *r, ngx_int_t rc)
         cln = cln->next;
     }
 
-    //ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   //"http terminate cleanup count:%d blk:%d",
-                   //mr->count, mr->blocked);
-
     ngx_http_close_request(mr, rc);
 }
 
@@ -1051,13 +987,6 @@ ngx_http_close_request(ngx_http_request_t *r, ngx_int_t rc)
 	http_connection_ctx_t	*c;
 
 	c = r->connection;
-
-    //ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                   //"http request count:%d blk:%d", r->count, r->blocked);
-
-	//if (r->count == 0) {
-		//printf("http request count is zero");
-	//}
 
     //r->count--;
 
@@ -1134,17 +1063,8 @@ ngx_http_test_reading(ngx_http_request_t *r)
 	c = r->connection;
 	sock = c->socket;
 
-    //ngx_event_t       *rev;
-    //ngx_connection_t  *c;
-
-    //c = r->connection;
-    //rev = c->read;
-
-    //ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0, "http test reading");
-
 	n = socket_recv(sock, buf, 1, MSG_PEEK);
     if (n == 0) {
-        //rev->eof = 1;
         c->error = 1;
         err = 0;
 
@@ -1153,66 +1073,54 @@ ngx_http_test_reading(ngx_http_request_t *r)
         err = ngx_socket_errno;
 
         if (err != NGX_EAGAIN) {
-            //rev->eof = 1;
             c->error = 1;
 
 			goto closed;
         }
     }
-    //[> aio does not call this handler <]
-    //if ((ngx_event_flags & NGX_USE_LEVEL_EVENT) && rev->active) {
-        //if (ngx_del_event(rev, NGX_READ_EVENT, 0) != NGX_OK) {
-            //ngx_http_close_request(r, 0);
-        //}
-    //}
 	return;
 
 closed:
-
-    //if (err) {
-        //rev->error = 1;
-    //}
-
     printf("client prematurely closed connection\n");
 	ngx_http_finalize_request(c->request, NGX_HTTP_CLIENT_CLOSED_REQUEST);
 }
 
 
-static void
-ngx_http_writer(ngx_http_request_t *r)
-{
-    ngx_int_t                  rc;
-	http_connection_ctx_t	   *hc;
+//static void
+//ngx_http_writer(ngx_http_request_t *r)
+//{
+    //ngx_int_t                  rc;
+	//http_connection_ctx_t	   *hc;
 
-	hc = r->connection;
+	//hc = r->connection;
 
-	if(r->out)
-	{	//write output
-		ngx_http_finalize_request(r, ngx_http_write_filter(r, NULL));
-	}
-	else 
-	{
-		ngx_http_finalize_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
-	}
-}
+	//if(r->out)
+	//{	//write output
+		//ngx_http_finalize_request(r, ngx_http_write_filter(r, NULL));
+	//}
+	//else 
+	//{
+		//ngx_http_finalize_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
+	//}
+//}
 
-static ngx_int_t
-ngx_http_set_write_handler(ngx_http_request_t *r)
-{
-	socket_ctx_t			*sock;
-	http_connection_ctx_t	*conn;
+//static ngx_int_t
+//ngx_http_set_write_handler(ngx_http_request_t *r)
+//{
+	//socket_ctx_t			*sock;
+	//http_connection_ctx_t	*conn;
 
-	conn = r->connection;
-	sock = conn->socket;
+	//conn = r->connection;
+	//sock = conn->socket;
 
-    r->http_state = NGX_HTTP_WRITING_REQUEST_STATE;
+    //r->http_state = NGX_HTTP_WRITING_REQUEST_STATE;
 
-	r->read_event_handler = ngx_http_test_reading;
-	r->write_event_handler = ngx_http_writer;
+	//r->read_event_handler = ngx_http_test_reading;
+	//r->write_event_handler = ngx_http_writer;
 
-	//if error then error
-	return io_poll_ctl(sock->io, IO_EVENT_READ | IO_EVENT_WRITE, IO_CTL_MOD, sock);
-}
+	////if error then error
+	//return io_poll_ctl(sock->io, IO_EVENT_READ | IO_EVENT_WRITE, IO_CTL_MOD, sock);
+//}
 
 static void 
 ngx_http_set_exten(ngx_http_request_t *r)
@@ -1546,11 +1454,6 @@ ngx_http_process_unique_header_line(ngx_http_request_t *r, ngx_table_elt_t *h,
     }
 
 	printf("client sent duplicate header line");
-    //ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
-                  //"client sent duplicate header line: \"%V: %V\", "
-                  //"previous value: \"%V: %V\"",
-                  //&h->key, &h->value, &(*ph)->key, &(*ph)->value);
-
     ngx_http_finalize_request(r, NGX_HTTP_BAD_REQUEST);
 
     return NGX_ERROR;
@@ -1601,7 +1504,7 @@ ngx_http_process_host(ngx_http_request_t *r, ngx_table_elt_t *h,
     rc = ngx_http_validate_host(&host, r->pool, 0);
 
     if (rc == NGX_DECLINED) {
-        printf("client sent invalid host header");
+        printf("client sent invalid host header\n");
         ngx_http_finalize_request(r, NGX_HTTP_BAD_REQUEST);
         return NGX_ERROR;
     }

@@ -49,7 +49,7 @@ server_ctx_t* server_init(config_t* conf)
 	l_sock->data = (void*) s_ctx;
 	l_sock->error_hanler = server_close_listener;
 
-	in_addr_t port = serv_conf->port == 0 ? htons(DEFAULT_PORT) : serv_conf->port;
+	in_addr_t port = serv_conf->port == 0 ? htons(SERVER_DEFAULT_PORT) : serv_conf->port;
 	if(socket_bind(l_sock, serv_conf->ip, port) == NMINX_ERROR)
 	{
 		printf("Failed bind socket!\n");
@@ -110,7 +110,6 @@ int server_process_events(server_ctx_t* s_ctx)
 		return errno != EINTR ? NMINX_ERROR : NMINX_ABORT;
 	}
 
-	// timeout handling 
 	for(int i = 0; i < nc; ++i)
 	{
 		socket_ctx_t* sock = sb[i];

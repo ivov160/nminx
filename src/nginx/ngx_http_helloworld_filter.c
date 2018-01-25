@@ -5,8 +5,8 @@
 
 #include <nminx/http_request.h>
 
-static u_char msg[sizeof("Hello World!!")] = "Hello World!!";
-static size_t msg_len = sizeof("Hello World!!") - 1;
+static u_char msg[sizeof("hello world")] = "hello world";
+static size_t msg_len = sizeof("hello world") - 1;
 
 ngx_int_t
 ngx_http_helloworld_filter(ngx_http_request_t *r)

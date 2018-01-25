@@ -9,6 +9,12 @@ typedef struct socket_ctx_s socket_ctx_t;
 typedef struct server_ctx_s server_ctx_t;
 typedef struct http_connection_ctx_s http_connection_ctx_t;
 
+typedef struct process_ctx_s process_ctx_t;
+typedef struct process_state_s process_state_t;
+
+typedef struct watchdog_process_ctx_s watchdog_process_ctx_t;
+typedef struct watchdog_pool_ctx_s watchdog_pool_ctx_t;
+
 #define  NMINX_OK         NGX_OK			// 
 #define  NMINX_ERROR      NGX_ERROR
 #define  NMINX_AGAIN      NGX_AGAIN

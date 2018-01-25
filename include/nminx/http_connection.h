@@ -10,11 +10,23 @@
 #include <nginx/ngx_buf.h>
 #include <nginx/ngx_http_request.h>
 
+
+/**
+ * @defgroup connection Connection 
+ * @brief Работа с сетевым подключением
+ *
+ * @addtogroup connection
+ * @{
+ */
+
 #define NGX_LOWLEVEL_BUFFERED  0x0f
 #define NGX_SSL_BUFFERED       0x01
 #define NGX_HTTP_V2_BUFFERED   0x02
 
 typedef struct http_large_buffer_s http_large_buffer_t;
+/**
+ * @brief Структура расширенного буфера
+ */
 struct http_large_buffer_s
 {
     ngx_chain_t                      *busy;
@@ -23,6 +35,9 @@ struct http_large_buffer_s
     ngx_chain_t                      *free;
 };
 
+/**
+ * @brief Контекст подключения
+ */
 struct http_connection_ctx_s
 {
 	// structured fields
@@ -60,5 +75,9 @@ int http_listner_init_handler(config_t* conf, socket_ctx_t* socket);
 void http_connection_accept(socket_ctx_t* l_socket);
 void http_connection_request_handler(socket_ctx_t* socket);
 void http_connection_errror_handler(socket_ctx_t* socket);
+
+/**
+ * @}
+ */
 
 #endif //__NMINX_HTTP_CONNECTION_H

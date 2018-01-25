@@ -1,4 +1,5 @@
 #include <nminx/watchdog.h>
+#include <nminx/process.h>
 
 #include <sys/wait.h>
 
@@ -12,85 +13,74 @@
 #include <string.h>
 
 
-/** @todo	think about is_alive flag, may be good ide for checking watched processed,
- *			now watched process is where pid > 0
- */
-typedef struct 
+static watchdog_pool_ctx_t* wdt_pool = NULL;
+
+static watchdog_process_ctx_t* watchdog_find_process(pid_t pid);
+
+int watchdog_start(watchdog_pool_ctx_t* wdtp)
 {
-	pid_t pid;
-	watchdog_process_config_t* wd_config;
-
-} watchdog_process_info_t;
-
-struct watchdog_config
-{
-	watchdog_process_info_t* pool;
-	uint32_t size;
-};
-
-static struct watchdog_config w_config = { NULL, 0 };
-
-static watchdog_process_info_t* watchdog_find_process(pid_t pid);
-
-
-int watchdog_start(watchdog_process_config_t* pool, uint32_t size)
-{
-	w_config.pool = (watchdog_process_info_t*) calloc(size, sizeof(watchdog_process_info_t));
-	if(!w_config.pool)
+	wdt_pool = wdtp;
+	if(!wdt_pool)
 	{
 		printf("Failed initialize array for watchdog poll!\n");
 		return NMINX_ERROR;
 	}
-	w_config.size = size;
 
-	for(uint32_t i = 0; i < size; ++i)
+	for(uint32_t i = 0; i < wdt_pool->size; ++i)
 	{
-		watchdog_process_config_t* w_p = &pool[i];
-		watchdog_process_info_t* w_pi = &w_config.pool[i];
+		watchdog_process_ctx_t* wp = &wdt_pool->pool[i];
 
-		if(!w_p->handler || !w_p->process)
+		if(!wp->handler || !wp->process)
 		{	//skip bad process 
 			continue;
 		}
 
-		pid_t c_pid = process_spawn(w_p->process);
+		pid_t c_pid = process_spawn(wp->process);
 		if(c_pid == -1)
 		{
 			printf("Failed start child porcess\n");
 			return NMINX_ERROR;
 		}
-		w_pi->pid = c_pid;
-		w_pi->wd_config = w_p;
+		wp->pid = c_pid;
 	}
 	return NMINX_OK;
 }
 
-/** @todo	think about wait state
+/** 
+ * @todo	think about wait state
  */
 int watchdog_stop()
 {
-	watchdog_signal_all(SIGTERM);
-
-	if(w_config.pool)
+	int is_done = FALSE;
+	while(!is_done)
 	{
-		free(w_config.pool);
-		w_config.size = 0;
+		watchdog_signal_all(SIGTERM);
+
+		// NMINX_AGAIN - not lef child
+		process_state_t p_state;
+		int rc = watchdog_poll(&p_state);
+
+		if(rc == NMINX_AGAIN)
+		{
+			is_done = TRUE;
+		}
 	}
+	wdt_pool = NULL;
 }
 
 int watchdog_signal_all(int sig)
 {
-	for(uint32_t i = 0; i < w_config.size; ++i)
+	for(uint32_t i = 0; i < wdt_pool->size; ++i)
 	{
-		watchdog_process_info_t* pi = &w_config.pool[i];
-		if(pi->pid == 0)
+		watchdog_process_ctx_t* p = &wdt_pool->pool[i];
+		if(p->pid == 0)
 		{	//skip not watched process
 			continue;
 		}
 
-		if(process_signal(pi->pid, sig) == NMINX_ERROR)
+		if(process_signal(p->pid, sig) == NMINX_ERROR)
 		{
-			printf("Failed notify pid: %d\n", pi->pid);
+			printf("Failed notify pid: %d, error: %s\n", p->pid, strerror(errno));
 			return NMINX_ERROR;
 		}
 	}
@@ -99,12 +89,12 @@ int watchdog_signal_all(int sig)
 
 int watchdog_signal_one(int sig, pid_t pid)
 {
-	watchdog_process_info_t* pi = watchdog_find_process(pid);
-	if(pi)
+	watchdog_process_ctx_t* p = watchdog_find_process(pid);
+	if(p)
 	{
-		if(process_signal(pi->pid, sig) == NMINX_ERROR)
+		if(process_signal(p->pid, sig) == NMINX_ERROR)
 		{
-			printf("Failed notify pid: %d\n", pi->pid);
+			printf("Failed notify pid: %d\n", p->pid);
 			return NMINX_ERROR;
 		}
 	}
@@ -113,7 +103,7 @@ int watchdog_signal_one(int sig, pid_t pid)
 
 int watchdog_exec(uint32_t ms_timeout)
 {
-	process_state_t p_state;
+	process_state_t p_state = { 0 };
 	int result = watchdog_poll(&p_state);
 
 	if(result == NMINX_ERROR)
@@ -121,7 +111,7 @@ int watchdog_exec(uint32_t ms_timeout)
 		return NMINX_ERROR;
 	}
 
-	if(result == NMINX_AGAIN && w_config.size > 0)
+	if(result == NMINX_AGAIN && wdt_pool->size > 0)
 	{
 		struct timespec ts;
 		ts.tv_sec = ms_timeout / 1000;
@@ -130,32 +120,29 @@ int watchdog_exec(uint32_t ms_timeout)
 	}
 	else
 	{
-		watchdog_process_info_t* pi = watchdog_find_process(p_state.pid);
-		if(!pi)
+		watchdog_process_ctx_t *p = watchdog_find_process(p_state.pid);
+		printf("watchdog find ctx: %p\n", (void*) p);
+		if(!p)
 		{
 			printf("watchdog_exec not found child process pid: %d\n", p_state.pid);
 			return NMINX_ERROR;
 		}
 
-		watchdog_process_config_t* wdc = pi->wd_config;
-		if(wdc->handler)
-		{
-			int cmd = wdc->handler(&p_state, wdc->data);
-			if(cmd == NMINX_AGAIN)
-			{	// restart watched process
-				pid_t c_pid = process_spawn(wdc->process);
-				if(c_pid == -1)
-				{
-					printf("Failed start child porcess\n");
-					return NMINX_ERROR;
-				}
-				//printf("wdt pid change old: %d, new: %d\n", pi->pid, c_pid);
-				pi->pid = c_pid;
+		int cmd = p->handler(&p_state, p->data);
+		if(cmd == NMINX_AGAIN)
+		{	// restart watched process
+			pid_t c_pid = process_spawn(p->process);
+			if(c_pid == -1)
+			{
+				printf("Failed start child porcess\n");
+				return NMINX_ERROR;
 			}
-			else
-			{	// stop watching process
-				pi->pid = 0;
-			}
+			printf("wdt pid change p: %p, old: %d, new: %d\n", (void*)p, p->pid, c_pid);
+			p->pid = c_pid;
+		}
+		else
+		{	// stop watching process
+			p->pid = 0;
 		}
 	}
 	return NMINX_OK;
@@ -185,8 +172,6 @@ int watchdog_poll(process_state_t* pstate)
 		};
 	}
 
-	memset(pstate, 0, sizeof(process_state_t));
-
 	pstate->pid = c_pid;
 	if(WIFEXITED(status))
 	{
@@ -209,14 +194,15 @@ int watchdog_poll(process_state_t* pstate)
 	return NMINX_OK;
 }
 
-static watchdog_process_info_t* watchdog_find_process(pid_t pid)
+static watchdog_process_ctx_t* watchdog_find_process(pid_t pid)
 {
-	for(uint32_t i = 0; i < w_config.size; ++i)
+	for(uint32_t i = 0; i < wdt_pool->size; ++i)
 	{
-		watchdog_process_info_t* pi = &w_config.pool[i];
-		if(pi->pid == pid)
+		watchdog_process_ctx_t* p = &wdt_pool->pool[i];
+		if(p->pid == pid)
 		{
-			return pi;
+			printf("watchdog find return ctx: %p\n", (void*) p);
+			return p;
 		}
 	}
 	return NULL;

@@ -150,7 +150,7 @@ ngx_http_header_filter(ngx_http_request_t *r)
 	http_connection_ctx_t	  *c;
     u_char                    addr[NGX_SOCKADDR_STRLEN];
 
-	u_char					  ngx_time_now_buf[sizeof("Mon, 28 Sep 1970 06:00:00 GMT")];
+	u_char					  ngx_time_now_buf[sizeof("Mon, 28 Sep 1970 06:00:00 GMT") - 1];
 	ngx_str_t				  ngx_time_now;
 
 	ngx_http_time(ngx_time_now_buf, time(NULL));

@@ -45,9 +45,6 @@ socket_ctx_t* socket_create(io_ctx_t* io)
 		sock->write_handler = socket_stub_action;
 		sock->error_hanler = socket_stub_action;
 
-		//sock->data = NULL;
-		//sock->cleanup_handler = NULL;
-
 		return sock;
 	}
 	return NULL;
@@ -134,15 +131,8 @@ socket_ctx_t* socket_accept(socket_ctx_t* socket)
 			c_socket->write_handler = socket_stub_action;
 			c_socket->error_hanler = socket_stub_action;
 
-			//c_socket->data = NULL;
-			//c_socket->cleanup_handler = NULL;
-
 			return c_socket;
 		} 
-		//if (errno != EAGAIN) 
-		//{
-			//printf("mtcp_accept() error %s\n", strerror(errno));
-		//}
 		return NULL;
 	}
 	return NULL;

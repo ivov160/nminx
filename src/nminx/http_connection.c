@@ -186,13 +186,6 @@ void http_connection_request_handler(socket_ctx_t* socket)
 	int rsize = socket_read(socket, buf->last, buf_size);
 	if(rsize == 0 && errno == EAGAIN)
 	{
-		///@note connection timeout not started, because mtcp is control this
-		///@note in nginx read event force added to event pool
-		
-		// from nginx if connection read return again
-        if (ngx_pfree(hc->pool, buf->start) == NMINX_OK) {
-            buf->start = NULL;
-        }
 		return;
 	}
 

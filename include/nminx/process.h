@@ -6,27 +6,13 @@
 
 typedef int (*process_ptr)(void*);
 
-typedef struct 
+struct process_ctx_s
 {
 	process_ptr process;
 	void* data;
+};
 
-} process_config_t;
-
-typedef struct 
-{
-	char* work_dir;
-	char* pid_file;
-
-	uid_t uid;
-	gid_t gid;
-
-	process_config_t* process;
-
-} daemon_config_t;
-
-int process_daemon(daemon_config_t* dc);
-pid_t process_spawn(process_config_t* pc);
+pid_t process_spawn(process_ctx_t* pc);
 int process_signal(pid_t pid, int sig);
 
 

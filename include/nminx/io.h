@@ -4,6 +4,16 @@
 #include <nminx/nminx.h>
 #include <nminx/config.h>
 
+/**
+ * @defgroup io Io 
+ * @brief Работа с событиями
+ * 
+ * Является небольшой оберткой для mtcp
+ * На тот случай если нужно будет менять
+ *
+ * @addtogroup io
+ * @{
+ */
 enum io_operation
 {
 	IO_CTL_ADD = 1, 
@@ -32,5 +42,9 @@ int io_destroy(io_ctx_t* io);
 
 int io_poll_ctl(io_ctx_t* io, int op, int flags, socket_ctx_t* sock);
 int io_poll_events(io_ctx_t* io, socket_ctx_t** s_buff, int s_buff_size);
+
+/**
+ * @}
+ */
 
 #endif //_NMINX_IO_H
